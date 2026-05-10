@@ -203,8 +203,8 @@ export default async (req) => {
     if ((preferencia === "anthropic" || preferencia === "claude") && anthropicReady) providers.push("anthropic");
     if (preferencia === "openai" && openaiReady) providers.push("openai");
     if (!providers.length) {
-      if (anthropicReady) providers.push("anthropic");
       if (openaiReady) providers.push("openai");
+      if (anthropicReady) providers.push("anthropic");
     }
     if (!providers.includes("openai") && openaiReady) providers.push("openai");
     if (!providers.includes("anthropic") && anthropicReady && preferencia !== "openai") providers.push("anthropic");

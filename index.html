@@ -8057,6 +8057,92 @@ function promptDimRecuperacaoIA(){
   return 'Você é engenheiro civil especialista em dimensionamento de recursos para obras. A tentativa completa demorou demais nesta obra; gere um dimensionamento técnico consistente usando somente os dados essenciais abaixo, sem anexos longos.\n\nOBRA: '+obra.nome+'\nTIPO: '+(obra.tipo||'não informado')+'\nÁREA: '+(obra.area?obra.area+' m²':'não informada')+'\nVALOR: '+(obra.valor?'R$ '+Number(obra.valor).toLocaleString('pt-BR'):'não informado')+'\nPRAZO: '+(obra.inicio&&obra.fim?obra.inicio+' a '+obra.fim:'não informado')+'\nLOCAL: '+(obra.local||'não informado')+'\nDESCRIÇÃO: '+desc+regrasTecnicasObrigatoriasIA(obra)+'\n\nRetorne SOMENTE JSON válido sem markdown. Para CBUQ/asfalto, mantenha obrigatoriamente maquinas de pavimentacao em maquinas/equipamentos:\n{"resumo":{"total_pessoal":0,"pico_obra":0,"total_equipamentos":0,"total_maquinas":0,"custo_estimado_mensal":"R$ X.XXX","obs_pessoal":"","obs_epi":""},"pessoal":[{"funcao":"","quantidade":0,"fase":"","qualificacao":"","regime":"CLT/Subcontratado/Horista","obs":""}],"epi":[{"nome":"","ca":"","quantidade":0,"periodicidade":"","aplicacao":"","custo_unit":"R$ XX"}],"ferramental":[{"nome":"","quantidade":0,"fase":"","aquisicao":"proprio/aluguel/comprar","custo":"R$ XX","obs":""}],"maquinas":[{"nome":"","especificacao":"","quantidade":0,"fase":"","aquisicao":"proprio/aluguel/contratar","custo_mensal":"R$ XX","obs":""}],"equipamentos":[{"nome":"","especificacao":"","quantidade":0,"sistema":"Elétrico/Hidráulico/Mecânico/Geral","aquisicao":"proprio/aluguel/comprar","custo":"R$ XX"}],"observacoes":""}';
 }
 
+function gerarPlanejamentoLocalEngenhariaV2(){
+  var obra = obraAtualIA();
+  if(!obra) throw new Error('Abra uma obra antes de usar esta analise.');
+  var resumoOrc = orcObraResumoArquivo || (obra.analise_orc && obra.analise_orc.__resumo_arquivo) || null;
+  var total = Number(obra.valor || obra.contrato || (resumoOrc && resumoOrc.total_geral_num) || 0);
+  var textoObra = [obra.nome,obra.tipo,obra.local,obra.end,obra.desc,JSON.stringify(resumoOrc||{})].join(' ');
+  var pav = /cb[uú]q|asfalto|asf[aá]lt|cap\b|pavimenta|imprima|pintura de liga|recape|capeamento|vi[aá]ria|ponte|acesso/i.test(textoObra);
+  function parseData(v){
+    var s=String(v||'').trim();
+    var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m) return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+    m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if(m) return new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
+    return null;
+  }
+  function mesLabel(d,i){
+    if(!d) return 'Mes '+(i+1);
+    var x=new Date(d.getFullYear(),d.getMonth()+i,1);
+    return String(x.getFullYear())+'-'+String(x.getMonth()+1).padStart(2,'0');
+  }
+  var di=parseData(obra.inicio), df=parseData(obra.fim);
+  var meses = 6;
+  if(di&&df) meses=Math.max(1,Math.min(18,(df.getFullYear()-di.getFullYear())*12+(df.getMonth()-di.getMonth())+1));
+  var basePesos = pav ? [8,12,18,22,18,12,10] : [10,15,20,20,15,12,8];
+  var pesos=[];
+  for(var i=0;i<meses;i++) pesos.push(basePesos[Math.min(basePesos.length-1, Math.floor(i*basePesos.length/meses))]);
+  var soma=pesos.reduce(function(a,b){return a+b;},0)||1, acum=0;
+  var curva = pesos.map(function(p,i){
+    var valor = total ? Math.round((total*p/soma)*100)/100 : 0;
+    acum += (p/soma)*100;
+    return {mes:mesLabel(di,i),valor:valor,acumulado:Math.min(100,Math.round(acum))};
+  });
+  if(curva.length) curva[curva.length-1].acumulado=100;
+  var fasesPav = [
+    {fase:'Mobilizacao, administracao local e canteiro',total:6,composicao:'Engenheiro/RT, mestre, almoxarife/apontador, equipe de apoio, mobilizacao de maquinas e sinalizacao provisoria.'},
+    {fase:'Topografia, locacao, liberacoes e controle inicial',total:4,composicao:'Topografo, auxiliar, encarregado e equipe de controle tecnologico/laboratorio.'},
+    {fase:'Terraplenagem, regularizacao, sub-base/base e drenagem associada',total:10,composicao:'Encarregado, operadores de motoniveladora, pa carregadeira, rolos, caminhao pipa, motoristas e ajudantes.'},
+    {fase:'Imprimacao, pintura de ligacao e preparacao para CBUQ/CAP',total:8,composicao:'Caminhao espargidor, equipe de limpeza, apoio de transito, encarregado e controle de taxa de aplicacao.'},
+    {fase:'Fornecimento, transporte, espalhamento e compactacao de CBUQ',total:12,composicao:'Vibroacabadora, rolo tandem, rolo pneumatico, caminhoes basculantes, equipe de acabamento, operadores e controle de temperatura.'},
+    {fase:'Ensaios, arremates, sinalizacao, limpeza e entrega',total:6,composicao:'Laboratorio/ensaios, topografia de conferencia, equipe de sinalizacao, acabamento e desmobilizacao.'}
+  ];
+  var fasesGerais = [
+    {fase:'Mobilizacao, canteiro e planejamento executivo',total:5,composicao:'Engenheiro/RT, mestre, almoxarife/apontador e equipe de apoio.'},
+    {fase:'Demolicoes, remocoes e preparacao das frentes',total:8,composicao:'Encarregado, pedreiros, serventes, ferramentas de corte, cacambas e transporte.'},
+    {fase:'Estrutura, recuperacoes, alvenarias e instalacoes embutidas',total:10,composicao:'Pedreiros, carpinteiros/armadores quando aplicavel, eletricista/hidraulico e serventes.'},
+    {fase:'Revestimentos, pisos, impermeabilizacoes e acabamentos',total:12,composicao:'Pedreiros de acabamento, pintores, eletricistas, hidraulicos e equipe de limpeza.'},
+    {fase:'Comissionamento, testes, arremates e entrega',total:5,composicao:'RT, mestre, equipe de arremates, testes de instalacoes, limpeza final e documentacao.'}
+  ];
+  return {
+    objetivo: pav ? 'Executar a obra com planejamento integrado de pavimentacao/asfalto, tratando base, imprimacao, pintura de ligacao, CBUQ/CAP, compactacao, ensaios e liberacoes como frentes criticas.' : 'Executar a obra com frentes sequenciadas, controle de produtividade, compras antecipadas, qualidade, seguranca e validacao de medicoes.',
+    restricoes: pav ? 'Confirmar licencas, transito/acesso, janela climatica, disponibilidade de usina/CBUQ/CAP, distancia de transporte, controle de temperatura, ensaios e liberacao da base antes do revestimento.' : 'Confirmar interferencias, liberacao das frentes, suprimentos de maior prazo, compatibilizacao de projetos, seguranca e sequencia de medicoes.',
+    orcamento: total || 0,
+    contingencia: 10,
+    bdi: 25,
+    pagamento: 'Parcelado conforme medicoes fisicas; curva financeira estimada pelo sequenciamento executivo.',
+    distribuicao: 'Curva S gerada localmente pelo Motor Engenharia v2 a partir do valor/prazo da obra e da tipologia detectada.',
+    curva_s: curva,
+    pico_mdo: pav ? 12 : 10,
+    min_mdo: 4,
+    equipe_fases: pav ? fasesPav : fasesGerais,
+    subcontratados: pav ? 'Usina/fornecedor de CBUQ ou CAP, transporte basculante, topografia, laboratorio de solos/asfalto, sinalizacao e eventual terraplenagem.' : 'Equipes especializadas conforme escopo: instalacoes, impermeabilizacao, pintura, serralheria, ensaios e transporte/cacamba.',
+    rts: 'Engenheiro civil responsavel tecnico; ART/RRT dos servicos especializados quando aplicavel; responsavel por seguranca conforme porte da obra.',
+    materiais_criticos: pav ? [
+      {material:'CBUQ / massa asfaltica',quantidade:'Conferir no orcamento e traco aprovado',lead_time:'7 a 15 dias',prazo_compra:'Antes da liberacao da base',urgencia:'alta'},
+      {material:'CAP/emulsao para imprimacao e pintura de ligacao',quantidade:'Conferir taxa de aplicacao',lead_time:'7 a 15 dias',prazo_compra:'Antes das frentes asfalticas',urgencia:'alta'},
+      {material:'Agregados/base/sub-base',quantidade:'Conferir jazida, DMT e ensaios',lead_time:'10 a 20 dias',prazo_compra:'Mobilizacao',urgencia:'alta'},
+      {material:'Materiais de sinalizacao e controle de transito',quantidade:'Conforme plano de sinalizacao',lead_time:'5 a 10 dias',prazo_compra:'Antes do inicio das frentes',urgencia:'media'}
+    ] : [
+      {material:'Materiais de maior valor do orcamento',quantidade:'Conferir grupos principais',lead_time:'7 a 20 dias',prazo_compra:'Antes da frente executiva',urgencia:'alta'},
+      {material:'Instalacoes eletricas/hidraulicas',quantidade:'Conferir projeto e quantitativos',lead_time:'7 a 15 dias',prazo_compra:'Antes dos fechamentos',urgencia:'media'},
+      {material:'Acabamentos e itens sob encomenda',quantidade:'Conferir especificacoes',lead_time:'15 a 30 dias',prazo_compra:'No primeiro terco da obra',urgencia:'media'}
+    ],
+    riscos: pav ? [
+      {risco:'CBUQ/CAP previsto sem detalhamento de logistica, temperatura, transporte e compactacao',probabilidade:'media',impacto:'alto',mitigacao:'Fechar fornecedor/usina, DMT, frota, janela climatica, plano de rolagem e ensaios antes da execucao.'},
+      {risco:'Base/sub-base liberada sem controle tecnologico suficiente',probabilidade:'media',impacto:'alto',mitigacao:'Exigir ensaios, grau de compactacao, topografia e aceite formal antes da imprimacao.'},
+      {risco:'Interferencia de transito, acesso ou clima nas frentes de pavimentacao',probabilidade:'media',impacto:'medio',mitigacao:'Planejar sinalizacao, desvios, frentes curtas e plano de chuva.'}
+    ] : [
+      {risco:'Omissao de servicos auxiliares no orcamento',probabilidade:'media',impacto:'alto',mitigacao:'Conferir composicoes, produtividade, transporte, perdas, descarte e administracao local.'},
+      {risco:'Materiais criticos comprados tarde',probabilidade:'media',impacto:'medio',mitigacao:'Criar mapa de compras no inicio e travar fornecedores dos itens de maior prazo.'},
+      {risco:'Frentes liberadas sem compatibilizacao',probabilidade:'media',impacto:'alto',mitigacao:'Revisar projeto, memoriais, interferencias e medicoes antes de iniciar cada etapa.'}
+    ],
+    estrategia: pav ? 'Priorizar liberacao da base e controle tecnologico antes de qualquer revestimento. Contratar ou reservar vibroacabadora, rolo tandem, rolo pneumatico, caminhoes basculantes, espargidor, topografia e laboratorio. Executar trechos por janelas curtas, com controle de temperatura, compactacao, sinalizacao e aceite por etapa.' : 'Abrir frentes por precedencia tecnica, travar compras criticas no inicio, manter medicoes semanais, controlar produtividade e registrar interferencias para evitar aditivos e atrasos.',
+    _motor_v2:{versao:'engenharia-v2-local',motivo:'fallback de planejamento apos timeout do provedor IA'}
+  };
+}
+
 function importarResultadoModuloIA(modulo,json){
   modulo = normalizarModuloImport(modulo);
   if(modulo==='orcamento-geral') return importOrcamentoGeral(json);
@@ -8198,6 +8284,9 @@ async function analisarModuloIA(modulo,btn){
       if((modulo==='orc-obra' || modulo==='orcamento-geral') && resumoOrcAtual && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
         setStatusModuloIA(modulo,'A IA demorou. Gerando analise local confiavel com os dados extraidos da planilha...','#f5c842');
         j = {json:criarAnaliseOrcamentoArquivo(resumoOrcAtual)};
+      }else if(modulo==='plan' && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
+        setStatusModuloIA(modulo,'A IA demorou. Gerando planejamento local com Motor Engenharia v2...','#f5c842');
+        j = {json:gerarPlanejamentoLocalEngenhariaV2()};
       }else if(modulo==='dim' && /demorou|timeout|time/i.test(String(primeiroErro&&primeiroErro.message||''))){
         setStatusModuloIA(modulo,'A tentativa completa demorou. Refazendo Dimensionamento com recuperação automática...','#f5c842');
         if(btn){btn.textContent='⏳ Recuperando...';}
