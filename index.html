@@ -3280,6 +3280,60 @@ function aplicarResumoArquivoOrcamento(j,resumo){
   return j;
 }
 
+function criarAnaliseOrcamentoArquivo(resumo){
+  resumo = resumo || {};
+  var total = Number(resumo.total_geral_num || 0);
+  var grupos = Array.isArray(resumo.top_grupos) ? resumo.top_grupos : [];
+  var top = grupos.slice(0,10).map(function(g){
+    var pct = total ? ((Number(g.total||0)/total)*100).toFixed(1).replace('.',',')+'%' : '';
+    return {
+      descricao: (g.item?g.item+' - ':'')+(g.descricao||''),
+      valor_total: g.total_fmt || fmtOrcMoeda(g.total),
+      percentual_orcamento: pct,
+      status: 'OK',
+      obs: 'Extraido diretamente da planilha.'
+    };
+  });
+  var temAsfalto = grupos.some(function(g){return /asfalt|cb[uú]q|cap|pavimenta|imprima|pintura de liga/i.test(g.descricao||'');});
+  var alertas = [{
+    tipo:'ALERTA',
+    item:'Analise local da planilha',
+    detalhe:'A IA demorou ou falhou; o app gerou esta analise com os valores extraidos diretamente do Excel para nao perder confiabilidade.'
+  }];
+  if(temAsfalto){
+    alertas.push({
+      tipo:'LACUNA_TECNICA',
+      item:'Pavimentacao / CBUQ / CAP',
+      detalhe:'Conferir na composicao executiva equipamentos de espalhamento e compactacao, transporte, imprimação, pintura de ligacao, ensaios e controle tecnologico.'
+    });
+  }
+  return {
+    status_geral:'ATENCAO',
+    justificativa_status:'Analise gerada pela leitura direta da planilha. O total geral, BDI e principais grupos foram extraidos do arquivo, sem depender do calculo da IA.',
+    resumo:{
+      total_geral:resumo.total_geral||'',
+      total_itens:resumo.total_itens||top.length||'',
+      bdi_identificado:resumo.bdi||'',
+      tipo_obra:temAsfalto?'Reforma com itens de pavimentacao/asfalto e servicos prediais':'Orcamento de obra/reforma'
+    },
+    top_itens:top,
+    grupos:grupos.slice(0,12).map(function(g){
+      var pct = total ? ((Number(g.total||0)/total)*100).toFixed(1).replace('.',',')+'%' : '';
+      return {nome:(g.item?g.item+' - ':'')+(g.descricao||''),valor:g.total_fmt||fmtOrcMoeda(g.total),percentual:pct};
+    }),
+    alertas:alertas,
+    recomendacoes:[
+      'Validar composicoes e codigos SINAPI/SICRO dos grupos de maior valor antes da proposta.',
+      'Conferir se itens criticos possuem memoria de calculo, quantitativos e produtividade compativeis.',
+      temAsfalto ? 'Para CBUQ/CAP, confirmar logistica, distancia de transporte, usina/fornecimento, aplicacao, compactacao e ensaios.' : 'Conferir BDI, encargos, administracao local e custos indiretos.'
+    ].filter(Boolean),
+    materiais:[],
+    equipamentos:[],
+    insumos:[],
+    __resumo_arquivo:resumo
+  };
+}
+
 function fOrcTipo(v,btn){
   orcTipo = "completo";
   document.querySelectorAll("#ch-orc-tipo .chip").forEach(function(b){b.classList.remove("on");});
@@ -7899,7 +7953,7 @@ function promptOrcamentoGeralIA(){
   };
   var prompt = instrucoesOrc[orcTipo] || instrucoesOrc.analise;
   prompt += regrasTecnicasOrcamentoIA();
-  var limiteTexto = orcTipo === 'completo' ? 32000 : 50000;
+  var limiteTexto = orcResumoArquivo ? 14000 : (orcTipo === 'completo' ? 22000 : 32000);
   if(orcTipo === 'completo'){
     prompt += '\n\nMODO COMPLETO TECNICO: sintetize sem superficialidade. Nao precisa listar todos os itens, mas deve listar todos os itens criticos para execucao e nao pode omitir servicos/equipamentos essenciais. Limite materiais, equipamentos, insumos, top_itens, alertas e recomendacoes a no maximo 18 registros cada.';
   }
@@ -7912,7 +7966,7 @@ function promptOrcObraIA(){
   var ctx = document.getElementById('orc-obra-ctx') ? document.getElementById('orc-obra-ctx').value.trim() : '';
   var instr = (typeof orcInstrucoesObra !== 'undefined' && orcInstrucoesObra[orcObraTipo]) ? orcInstrucoesObra[orcObraTipo] : 'Analise este orçamento e retorne somente JSON válido.';
   instr += regrasTecnicasOrcamentoIA();
-  var limiteTexto = orcObraTipo === 'completo' ? 32000 : 50000;
+  var limiteTexto = orcObraResumoArquivo ? 14000 : (orcObraTipo === 'completo' ? 22000 : 32000);
   if(orcObraTipo === 'completo'){
     instr += '\n\nMODO COMPLETO TECNICO: sintetize sem superficialidade. Nao precisa listar todos os itens, mas deve listar todos os itens criticos para execucao e nao pode omitir servicos/equipamentos essenciais. Limite materiais, equipamentos, insumos, top_itens, alertas e recomendacoes a no maximo 18 registros cada.';
   }
@@ -8102,6 +8156,11 @@ async function analisarModuloIA(modulo,btn){
     var prompt = promptModuloIA(modulo);
     var maxTokens = {plan:2600,canteiro:2800,dim:3400,cron:2200,forn:1800,'orcamento-geral':(orcTipo==='completo'?4800:3600),'orc-obra':(orcObraTipo==='completo'?4800:3600),'proj-obra':3600}[modulo] || 3000;
     var timeoutMs = modulo==='forn' ? 16000 : ((modulo==='dim' || modulo==='plan') ? 38000 : (((modulo==='orc-obra' && orcObraTipo==='completo') || (modulo==='orcamento-geral' && orcTipo==='completo')) ? 40000 : 32000));
+    var resumoOrcAtual = modulo==='orc-obra' ? orcObraResumoArquivo : (modulo==='orcamento-geral' ? orcResumoArquivo : null);
+    if(resumoOrcAtual){
+      maxTokens = 2800;
+      timeoutMs = 14000;
+    }
     setStatusModuloIA(modulo,'Analisando com IA...','#4a90d9');
     if(btn){btn.disabled=true;btn.textContent='⏳ Analisando...';}
     var payload = {modulo:modulo,prompt:prompt,max_output_tokens:maxTokens};
@@ -8110,10 +8169,16 @@ async function analisarModuloIA(modulo,btn){
     try{
       j = await chamarIA(payload);
     }catch(primeiroErro){
-      if(modulo!=='dim' || !/demorou|timeout|time/i.test(String(primeiroErro&&primeiroErro.message||''))) throw primeiroErro;
-      setStatusModuloIA(modulo,'A tentativa completa demorou. Refazendo Dimensionamento com recuperação automática...','#f5c842');
-      if(btn){btn.textContent='⏳ Recuperando...';}
-      j = await chamarIA({modulo:modulo,prompt:promptDimRecuperacaoIA(),max_output_tokens:3000,timeout_ms:32000});
+      if((modulo==='orc-obra' || modulo==='orcamento-geral') && resumoOrcAtual && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
+        setStatusModuloIA(modulo,'A IA demorou. Gerando analise local confiavel com os dados extraidos da planilha...','#f5c842');
+        j = {json:criarAnaliseOrcamentoArquivo(resumoOrcAtual)};
+      }else if(modulo==='dim' && /demorou|timeout|time/i.test(String(primeiroErro&&primeiroErro.message||''))){
+        setStatusModuloIA(modulo,'A tentativa completa demorou. Refazendo Dimensionamento com recuperação automática...','#f5c842');
+        if(btn){btn.textContent='⏳ Recuperando...';}
+        j = await chamarIA({modulo:modulo,prompt:promptDimRecuperacaoIA(),max_output_tokens:3000,timeout_ms:32000});
+      }else{
+        throw primeiroErro;
+      }
     }
     importarResultadoModuloIA(modulo,j.json || j);
     setStatusModuloIA(modulo,'✅ Análise IA concluída e salva.','#00c896');
