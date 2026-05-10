@@ -8143,6 +8143,127 @@ function gerarPlanejamentoLocalEngenhariaV2(){
   };
 }
 
+function contextoObraLocalEngenhariaV2(){
+  var obra = obraAtualIA();
+  if(!obra) throw new Error('Abra uma obra antes de usar esta analise.');
+  var resumoOrc = orcObraResumoArquivo || (obra.analise_orc && obra.analise_orc.__resumo_arquivo) || null;
+  var total = Number(obra.valor || obra.contrato || (resumoOrc && resumoOrc.total_geral_num) || 0);
+  var texto = [obra.nome,obra.tipo,obra.local,obra.end,obra.desc,JSON.stringify(resumoOrc||{})].join(' ');
+  var pav = /cb[uú]q|asfalto|asf[aá]lt|cap\b|pavimenta|imprima|pintura de liga|recape|capeamento|vi[aá]ria|ponte|acesso/i.test(texto);
+  var area = Number(String(obra.area||'').replace(/[^\d,.]/g,'').replace(',','.')) || 0;
+  return {obra:obra,resumoOrc:resumoOrc,total:total,pav:pav,area:area};
+}
+
+function gerarCanteiroLocalEngenhariaV2(){
+  var ctx = contextoObraLocalEngenhariaV2();
+  var obra = ctx.obra, pav = ctx.pav;
+  var areaObra = ctx.area || 0;
+  var areaCant = areaObra ? Math.max(80, Math.round(areaObra * (pav ? 0.08 : 0.12))) : (pav ? 180 : 120);
+  var taxa = areaObra ? Math.round((areaCant / areaObra) * 100) : 0;
+  return {
+    area: areaCant,
+    area_obra: areaObra || '',
+    taxa: taxa || '',
+    topo: pav ? 'Prever topografia para locacao de eixos, greide, conferencias de base e liberacao antes da capa asfaltica.' : 'Levantamento inicial, locacao das frentes e conferencia de interferencias antes da mobilizacao.',
+    acesso: (obra.end || obra.local) ? 'Acesso principal por '+[obra.end,obra.local].filter(Boolean).join(' - ')+'. Controlar entrada de materiais, caminhoes e visitantes.' : 'Definir portao principal, rota de carga/descarga e separacao entre pedestres e veiculos.',
+    restricoes: pav ? 'Controlar trafego, poeira, chuva, acesso de caminhoes basculantes, janela de aplicacao de CBUQ/CAP e areas para equipamentos pesados.' : 'Confirmar interferencias, vizinhanca, area de descarga, ruido, poeira, residuos e seguranca perimetral.',
+    escritorio: 'Container ou sala provisoria para engenharia, documentos, reunioes curtas e controle de medicoes.',
+    vestiario: 'Vestiario/sanitarios dimensionados ao efetivo, ventilados, com limpeza diaria, conforme NR-18/NR-24.',
+    refeitorio: 'Area coberta para refeicoes, agua potavel, higiene e afastamento de poeira/residuos.',
+    deposito: pav ? 'Deposito para EPIs, sinalizacao, ferramentas, amostras, materiais de apoio e pequena manutencao.' : 'Almoxarifado seco para ferramentas, EPIs, insumos sensiveis e materiais de acabamento.',
+    guarita: 'Controle de acesso, registro de entregas, visitantes e epis obrigatorios.',
+    central: pav ? 'Area de apoio para controle tecnologico, topografia, sinalizacao e pequenas manutencoes.' : 'Central de apoio para preparos, cortes, formas/armacao quando aplicavel e apoio de instalacoes.',
+    energia: 'Ligacao provisoria com quadro protegido, aterramento, DR e distribuicao por circuitos identificados.',
+    potencia: pav ? 20 : 15,
+    agua: 'Ponto de agua potavel e agua de servico; prever esgoto/sumidouro ou solucao autorizada.',
+    internet: 'Internet movel/fixa para diario, fotos, documentos, medicoes e comunicacao com escritorio.',
+    icamento: pav ? 'Nao prioritario; prever apoio mecanizado para carga/descarga e movimentacao de materiais/equipamentos.' : 'Definir necessidade de talha, munck, elevador ou guincho conforme frentes e pesos.',
+    betoneira: pav ? 'Nao central; concreto apenas para servicos complementares, drenagem, sarjetas ou reparos.' : 'Betoneira/argamassadeira conforme volume, ou concreto usinado quando mais eficiente.',
+    circulacao: pav ? 'Separar rota de basculantes, espargidor, rolos e vibroacabadora da circulacao de pedestres.' : 'Rotas internas sinalizadas, piso seguro, sem cruzamento desnecessario entre pedestres e maquinas.',
+    descarga: pav ? 'Area temporaria para recebimento de materiais, sinalizacao e apoio a equipamentos, sem bloquear frente de aplicacao.' : 'Area de descarga proxima ao almoxarifado, com piso regular e controle de estoque.',
+    fluxo: pav ? 'Fluxo de basculantes em sentido definido, com sinaleiro e comunicacao com a frente de aplicacao.' : 'Fluxo com portao, descarga, estoque e retirada de residuos sem interferir na producao.',
+    tapume: 'Fechamento/sinalizacao perimetral conforme risco, vizinhanca e area publica.',
+    tapume_ext: areaObra ? Math.max(40, Math.round(Math.sqrt(areaObra) * 4)) : 80,
+    fachada: 'Protecoes coletivas em bordas, areas de queda, vias publicas e frentes expostas.',
+    placa: 'Placa de obra, ART/RRT, identificacao de responsaveis e sinalizacao obrigatoria.',
+    epi: 'Capacete, botina, colete/refletivo, luvas, oculos, protetor auricular e respiratorio conforme atividade.',
+    residuos: 'PGRCC com segregacao, baias/cacambas, transporte licenciado e comprovantes.',
+    limpeza: 'Rotina diaria de limpeza, controle de poeira/lama, lavagem de rodas quando necessario.',
+    amb: pav ? 'Controlar poeira, runoff, emulsao/CAP, temperatura, armazenamento temporario e descarte de residuos contaminados.' : 'Controlar poeira, ruido, efluentes, residuos e protecao de drenagem/solo.',
+    layout: '+---------------- CANTEIRO ----------------+\n| GUARITA | ESCRITORIO | VESTIARIO/REFEIT. |\n| DEPOSITO/ALMOX. | AREA DESCARGA          |\n| CIRCULACAO SINALIZADA / ROTA DE VEICULOS |\n| FRENTE DA OBRA / EQUIPAMENTOS / RESIDUOS |\n+------------------------------------------+',
+    checklist_nr18: [
+      {item:'Fechamento, sinalizacao e controle de acesso implantados',status:'pendente',prazo:'mobilizacao'},
+      {item:'Instalacoes sanitarias e area de refeicao adequadas ao efetivo',status:'pendente',prazo:'mobilizacao'},
+      {item:'Quadro eletrico provisiorio protegido, aterrado e identificado',status:'pendente',prazo:'mobilizacao'},
+      {item:'PGRCC e areas de residuos definidas',status:'pendente',prazo:'mobilizacao'},
+      {item:'Rotas de veiculos e pedestres segregadas',status:'pendente',prazo:'antes da producao'},
+      {item:'Plano de emergencia, extintores e primeiros socorros',status:'pendente',prazo:'mobilizacao'},
+      {item:'Treinamentos, EPIs e DDS por atividade',status:'pendente',prazo:'continuo'},
+      {item:pav?'Sinalizacao de transito e isolamento das frentes asfalticas':'Protecoes coletivas nas frentes com risco de queda',status:'pendente',prazo:'antes da frente'}
+    ],
+    _motor_v2:{versao:'engenharia-v2-local',motivo:'fallback de canteiro apos timeout do provedor IA'}
+  };
+}
+
+function gerarDimensionamentoLocalEngenhariaV2(){
+  var ctx = contextoObraLocalEngenhariaV2();
+  var obra = ctx.obra, pav = ctx.pav;
+  var pico = pav ? 12 : 10;
+  var pessoal = pav ? [
+    {funcao:'Engenheiro civil / RT',quantidade:1,fase:'Toda a obra',qualificacao:'CREA ativo e experiencia em obras viarias/asfalto',regime:'CLT',obs:'Responsavel por liberacoes, medicoes, qualidade e seguranca.'},
+    {funcao:'Mestre/encarregado de pavimentacao',quantidade:1,fase:'Terraplenagem, base e CBUQ',qualificacao:'Experiencia em CBUQ/CAP e equipes mecanizadas',regime:'CLT',obs:'Coordena frente, produtividade e interface com usina/transporte.'},
+    {funcao:'Topografo + auxiliar',quantidade:2,fase:'Locacao, greide e conferencias',qualificacao:'Topografia de obras viarias',regime:'Subcontratado',obs:'Liberar base, cotas, caimentos e conferencias finais.'},
+    {funcao:'Laboratorista / controle tecnologico',quantidade:1,fase:'Base, imprimação, CBUQ e compactacao',qualificacao:'Ensaios de solos/asfalto',regime:'Subcontratado',obs:'Controlar compactacao, granulometria, temperatura e laudos.'},
+    {funcao:'Operadores de maquinas',quantidade:5,fase:'Base e revestimento asfaltico',qualificacao:'Operacao de vibroacabadora, rolos, motoniveladora e pa',regime:'Subcontratado',obs:'Pode vir com locacao/empreiteiro especializado.'},
+    {funcao:'Motoristas de basculante/pipa/espargidor',quantidade:4,fase:'Transporte e aplicacao',qualificacao:'CNH adequada e experiencia em obra',regime:'Subcontratado',obs:'Dimensionar conforme DMT e janela de aplicacao.'},
+    {funcao:'Ajudantes/sinaleiros/acabamento',quantidade:4,fase:'Todas as frentes',qualificacao:'Treinamento de seguranca e sinalizacao',regime:'Horista',obs:'Apoio a sinalizacao, acabamento, limpeza e isolamento.'}
+  ] : [
+    {funcao:'Engenheiro civil / RT',quantidade:1,fase:'Toda a obra',qualificacao:'CREA ativo',regime:'CLT',obs:'Responsavel por planejamento, medicoes e qualidade.'},
+    {funcao:'Mestre de obras / encarregado',quantidade:1,fase:'Toda a obra',qualificacao:'Experiencia no tipo de obra',regime:'CLT',obs:'Coordena equipes e frentes.'},
+    {funcao:'Pedreiros / oficiais',quantidade:3,fase:'Execucao principal',qualificacao:'Experiencia comprovada',regime:'CLT',obs:'Ajustar conforme produtividade e prazo.'},
+    {funcao:'Serventes',quantidade:4,fase:'Toda a obra',qualificacao:'Treinamento de seguranca',regime:'CLT',obs:'Apoio, limpeza e transporte interno.'},
+    {funcao:'Eletricista / hidraulico',quantidade:2,fase:'Instalacoes',qualificacao:'NR-10 quando aplicavel',regime:'Subcontratado',obs:'Conforme escopo de instalacoes.'},
+    {funcao:'Pintor/acabador',quantidade:2,fase:'Acabamentos',qualificacao:'Experiencia em acabamento',regime:'Subcontratado',obs:'Entrada apos liberacao das bases.'}
+  ];
+  var maquinas = pav ? [
+    {nome:'Vibroacabadora de asfalto',especificacao:'Aplicacao de CBUQ',quantidade:1,fase:'Revestimento asfaltico',aquisicao:'aluguel',custo_mensal:'Cotacao regional',obs:'Equipamento critico; reservar com antecedencia.'},
+    {nome:'Rolo tandem liso',especificacao:'Compactacao inicial/intermediaria',quantidade:1,fase:'CBUQ/base',aquisicao:'aluguel',custo_mensal:'Cotacao regional',obs:'Controlar numero de passadas.'},
+    {nome:'Rolo pneumatico',especificacao:'Compactacao/acabamento',quantidade:1,fase:'CBUQ',aquisicao:'aluguel',custo_mensal:'Cotacao regional',obs:'Essencial para densidade e acabamento.'},
+    {nome:'Caminhao espargidor',especificacao:'Imprimacao e pintura de ligacao',quantidade:1,fase:'Pre-CBUQ',aquisicao:'contratar',custo_mensal:'Por diaria/servico',obs:'Conferir taxa de aplicacao.'},
+    {nome:'Caminhoes basculantes',especificacao:'Transporte de CBUQ/agregados',quantidade:3,fase:'Base e CBUQ',aquisicao:'contratar',custo_mensal:'Por viagem/diaria',obs:'Quantidade depende de DMT e producao da usina.'},
+    {nome:'Motoniveladora / pa carregadeira / caminhao pipa',especificacao:'Base, regularizacao e apoio',quantidade:3,fase:'Terraplenagem/base',aquisicao:'aluguel',custo_mensal:'Cotacao regional',obs:'Ajustar se a base ja estiver liberada.'}
+  ] : [
+    {nome:'Betoneira/argamassadeira',especificacao:'Pequenos volumes e argamassas',quantidade:1,fase:'Estrutura/alvenaria/acabamento',aquisicao:'aluguel',custo_mensal:'Cotacao local',obs:'Dispensar se concreto/argamassa forem usinados.'},
+    {nome:'Andaimes/escoras/plataformas',especificacao:'Acesso e trabalho em altura',quantidade:1,fase:'Execucao e acabamento',aquisicao:'aluguel',custo_mensal:'Cotacao local',obs:'Compatibilizar com NR-18.'},
+    {nome:'Cacamba/munck/apoio mecanizado',especificacao:'Carga, descarga e residuos',quantidade:1,fase:'Mobilizacao e execucao',aquisicao:'contratar',custo_mensal:'Por chamada',obs:'Conforme logistica da obra.'}
+  ];
+  var epiQtd = Math.max(pico + 4, pessoal.reduce(function(a,p){return a+(Number(p.quantidade)||0);},0));
+  return {
+    resumo:{total_pessoal:pessoal.reduce(function(a,p){return a+(Number(p.quantidade)||0);},0),pico_obra:pico,total_equipamentos:pav?8:6,total_maquinas:maquinas.length,custo_estimado_mensal:'A cotar por regiao',obs_pessoal:'Dimensionamento local do Motor Engenharia v2; ajuste apos produtividade, prazo, DMT e frentes simultaneas.',obs_epi:'Prever estoque reserva, substituicao por desgaste e CA valido.'},
+    pessoal:pessoal,
+    epi:[
+      {nome:'Capacete com jugular',ca:'CA valido',quantidade:epiQtd,periodicidade:'Substituir por dano/desgaste',aplicacao:'Todos os trabalhadores',custo_unit:'Cotacao local'},
+      {nome:'Botina de seguranca',ca:'CA valido',quantidade:epiQtd,periodicidade:'3 a 6 meses',aplicacao:'Todos os trabalhadores',custo_unit:'Cotacao local'},
+      {nome:'Colete refletivo',ca:'N/A ou CA aplicavel',quantidade:epiQtd,periodicidade:'Por desgaste',aplicacao:pav?'Frentes com trafego/equipamentos':'Circulacao e carga/descarga',custo_unit:'Cotacao local'},
+      {nome:'Luvas, oculos e protetor auricular',ca:'CA valido',quantidade:epiQtd,periodicidade:'Conforme atividade',aplicacao:'Corte, compactacao, maquinas, ferramentas e poeira',custo_unit:'Cotacao local'},
+      {nome:'Respirador PFF2/PFF3',ca:'CA valido',quantidade:epiQtd,periodicidade:'Por uso/poeira',aplicacao:'Poeira, corte, varricao, CAP/CBUQ quando aplicavel',custo_unit:'Cotacao local'}
+    ],
+    ferramental:[
+      {nome:'Kit de ferramentas manuais',quantidade:3,fase:'Geral',aquisicao:'comprar',custo:'Cotacao local',obs:'Trenas, prumos, niveis, marretas, pas, enxadas, chaves e extensoes.'},
+      {nome:'Nivel laser / mangueira de nivel / trena',quantidade:1,fase:'Locacao e conferencias',aquisicao:'proprio',custo:'Proprio/cotacao',obs:'Complementar com topografia quando necessario.'},
+      {nome:pav?'Termometro infravermelho e densimetro/ensaios terceirizados':'Furadeira, martelete e serra policorte',quantidade:1,fase:pav?'CBUQ e controle tecnologico':'Execucao',aquisicao:pav?'contratar':'aluguel',custo:'Cotacao local',obs:pav?'Controle de temperatura e ensaios sao essenciais.':'Ferramentas eletricas conforme frente.'}
+    ],
+    maquinas:maquinas,
+    equipamentos:[
+      {nome:'Extintores e sinalizacao de seguranca',especificacao:'Canteiro e frentes',quantidade:1,sistema:'Geral',aquisicao:'comprar',custo:'Cotacao local'},
+      {nome:'Quadro eletrico provisiorio',especificacao:'DR, aterramento e circuitos identificados',quantidade:1,sistema:'Eletrico',aquisicao:'comprar',custo:'Cotacao local'},
+      {nome:pav?'Cones, cavaletes e placas de transito':'EPCs: guarda-corpo, fitas, telas e placas',especificacao:'Sinalizacao e protecao coletiva',quantidade:1,sistema:'Geral',aquisicao:'comprar',custo:'Cotacao local'}
+    ],
+    observacoes:pav?'Nao iniciar CBUQ sem base liberada, imprimação/pintura de ligacao controladas, equipamentos reservados, plano de rolagem, temperatura e ensaios definidos.':'Validar quantitativos com cronograma, produtividade, frentes simultaneas e logistica do canteiro.',
+    _motor_v2:{versao:'engenharia-v2-local',motivo:'fallback de dimensionamento apos timeout do provedor IA'}
+  };
+}
+
 function importarResultadoModuloIA(modulo,json){
   modulo = normalizarModuloImport(modulo);
   if(modulo==='orcamento-geral') return importOrcamentoGeral(json);
@@ -8287,10 +8408,12 @@ async function analisarModuloIA(modulo,btn){
       }else if(modulo==='plan' && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
         setStatusModuloIA(modulo,'A IA demorou. Gerando planejamento local com Motor Engenharia v2...','#f5c842');
         j = {json:gerarPlanejamentoLocalEngenhariaV2()};
-      }else if(modulo==='dim' && /demorou|timeout|time/i.test(String(primeiroErro&&primeiroErro.message||''))){
-        setStatusModuloIA(modulo,'A tentativa completa demorou. Refazendo Dimensionamento com recuperação automática...','#f5c842');
-        if(btn){btn.textContent='⏳ Recuperando...';}
-        j = await chamarIA({modulo:modulo,prompt:promptDimRecuperacaoIA(),max_output_tokens:3000,timeout_ms:32000});
+      }else if(modulo==='canteiro' && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
+        setStatusModuloIA(modulo,'A IA demorou. Gerando canteiro local com Motor Engenharia v2...','#f5c842');
+        j = {json:gerarCanteiroLocalEngenhariaV2()};
+      }else if(modulo==='dim' && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
+        setStatusModuloIA(modulo,'A IA demorou. Gerando dimensionamento local com Motor Engenharia v2...','#f5c842');
+        j = {json:gerarDimensionamentoLocalEngenhariaV2()};
       }else{
         throw primeiroErro;
       }
