@@ -3165,6 +3165,120 @@ document.addEventListener("DOMContentLoaded",function(){
 // ==================== ORÇAMENTO ====================
 var orcTexto = "";
 var orcTipo = "completo";
+var orcResumoArquivo = null;
+var orcObraResumoArquivo = null;
+
+function fmtOrcMoeda(n){
+  n = Number(n || 0);
+  if(!isFinite(n) || !n) return '';
+  return 'R$ '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function normTxtOrc(v){
+  return String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+
+function numOrc(v){
+  if(typeof v === 'number' && isFinite(v)) return v;
+  if(typeof v !== 'string') return NaN;
+  var s = v.replace(/[^\d,.\-]/g,'').trim();
+  if(!s) return NaN;
+  if(s.indexOf(',') >= 0 && s.indexOf('.') >= 0) s = s.replace(/\./g,'').replace(',','.');
+  else if(s.indexOf(',') >= 0) s = s.replace(',','.');
+  var n = Number(s);
+  return isFinite(n) ? n : NaN;
+}
+
+function primeiroNumeroNaLinhaOrc(row, start){
+  for(var i=Math.max(0,start||0); i<row.length; i++){
+    var n = numOrc(row[i]);
+    if(isFinite(n) && Math.abs(n) > 0) return {valor:n,col:i};
+  }
+  return null;
+}
+
+function ultimoNumeroNaLinhaOrc(row){
+  for(var i=row.length-1; i>=0; i--){
+    var n = numOrc(row[i]);
+    if(isFinite(n) && Math.abs(n) > 0) return {valor:n,col:i};
+  }
+  return null;
+}
+
+function extrairResumoOrcamentoWorkbook(wb,nomeArquivo){
+  var resumo = {arquivo:nomeArquivo||'',total_geral_num:0,total_geral:'',bdi:'',sheet:'',celula_total:'',top_grupos:[],total_itens:0};
+  if(!wb || !wb.SheetNames || !wb.SheetNames.length || typeof XLSX === 'undefined') return null;
+  var candidatosTotal = [];
+  var grupos = [];
+  wb.SheetNames.forEach(function(sn){
+    var ws = wb.Sheets[sn];
+    var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+    rows.forEach(function(row,ridx){
+      var textos = row.map(normTxtOrc);
+      var linhaTxt = textos.join(' ');
+      if(!resumo.bdi && /bdi/.test(linhaTxt)){
+        var m = String(row.join(' ')).match(/(\d{1,2}(?:[,.]\d{1,4})?)\s*%/);
+        if(m) resumo.bdi = m[1].replace('.',',')+'%';
+      }
+      textos.forEach(function(t,cidx){
+        if(t.indexOf('total geral') >= 0){
+          var n = primeiroNumeroNaLinhaOrc(row,cidx+1) || ultimoNumeroNaLinhaOrc(row);
+          if(n) candidatosTotal.push({valor:n.valor,sheet:sn,row:ridx+1,col:n.col+1,peso:100});
+        }
+      });
+      if(textos[0] === 'total'){
+        var nt = ultimoNumeroNaLinhaOrc(row);
+        if(nt) candidatosTotal.push({valor:nt.valor,sheet:sn,row:ridx+1,col:nt.col+1,peso:80});
+      }
+      var item = String(row[0]||'').trim();
+      var desc = String(row[3]||row[2]||'').trim();
+      var total = numOrc(row[8]);
+      if(!isFinite(total)) total = (ultimoNumeroNaLinhaOrc(row)||{}).valor;
+      if(/^\d+$/.test(item) && desc && isFinite(total) && total > 0 && !/total/i.test(desc)){
+        grupos.push({item:item,descricao:desc,total:total});
+      }
+      if(/^\d+(?:\.\d+)+$/.test(item) && desc) resumo.total_itens++;
+    });
+  });
+  if(candidatosTotal.length){
+    candidatosTotal.sort(function(a,b){return (b.peso-a.peso) || (Math.abs(b.valor)-Math.abs(a.valor));});
+    var t = candidatosTotal[0];
+    resumo.total_geral_num = t.valor;
+    resumo.total_geral = fmtOrcMoeda(t.valor);
+    resumo.sheet = t.sheet;
+    resumo.celula_total = String.fromCharCode(64+t.col)+t.row;
+  }
+  resumo.top_grupos = grupos.sort(function(a,b){return b.total-a.total;}).slice(0,12).map(function(g){
+    return {item:g.item,descricao:g.descricao,total:g.total,total_fmt:fmtOrcMoeda(g.total)};
+  });
+  return (resumo.total_geral || resumo.bdi || resumo.top_grupos.length) ? resumo : null;
+}
+
+function textoResumoArquivoOrcamento(resumo){
+  if(!resumo) return '';
+  var linhas = ['--- RESUMO NUMERICO EXTRAIDO DO ARQUIVO (FONTE DE VERDADE) ---'];
+  if(resumo.arquivo) linhas.push('Arquivo: '+resumo.arquivo);
+  if(resumo.total_geral) linhas.push('TOTAL GERAL DETECTADO: '+resumo.total_geral+(resumo.celula_total?' (celula '+resumo.celula_total+')':''));
+  if(resumo.bdi) linhas.push('BDI DETECTADO: '+resumo.bdi);
+  if(resumo.total_itens) linhas.push('ITENS ANALITICOS DETECTADOS: '+resumo.total_itens);
+  if(resumo.top_grupos && resumo.top_grupos.length){
+    linhas.push('PRINCIPAIS GRUPOS/ETAPAS DETECTADOS:');
+    resumo.top_grupos.slice(0,10).forEach(function(g){linhas.push('- '+g.item+' '+g.descricao+': '+g.total_fmt);});
+  }
+  linhas.push('REGRA: se a IA calcular total diferente do TOTAL GERAL DETECTADO, manter o valor extraido do arquivo.');
+  return linhas.join('\n');
+}
+
+function aplicarResumoArquivoOrcamento(j,resumo){
+  if(!j || !resumo) return j;
+  j = Object.assign({}, j);
+  j.resumo = Object.assign({}, (j.resumo && typeof j.resumo === 'object') ? j.resumo : {});
+  if(resumo.total_geral) j.resumo.total_geral = resumo.total_geral;
+  if(resumo.bdi && !j.resumo.bdi_identificado) j.resumo.bdi_identificado = resumo.bdi;
+  if(resumo.total_itens && !j.resumo.total_itens) j.resumo.total_itens = resumo.total_itens;
+  j.__resumo_arquivo = resumo;
+  return j;
+}
 
 function fOrcTipo(v,btn){
   orcTipo = "completo";
@@ -3182,6 +3296,7 @@ function setOrcStatus(msg, cor){
 function resetOrcamento(){
   orcTexto = "";
   orcTipo = "completo";
+  orcResumoArquivo = null;
   document.getElementById("orc-ctx").value = "";
   document.getElementById("btn-orc-copy").disabled = true;
   document.getElementById("btn-orc-copy").textContent = "🚀 Analisar IA";
@@ -3206,6 +3321,7 @@ function processarOrcamento(input){
   var zone = document.getElementById("orc-zone");
   setOrcStatus("Lendo arquivo...", "#4a90d9");
   zone.style.borderColor = "#0057b7";
+  orcResumoArquivo = null;
 
   if(nome.endsWith(".pdf")){
     if(typeof pdfjsLib === "undefined"){
@@ -3249,7 +3365,8 @@ function processarOrcamento(input){
           var csv = XLSX.utils.sheet_to_csv(ws);
           linhas.push("=== PLANILHA: "+sn+" ===\n"+csv);
         });
-        orcTexto = linhas.join("\n\n");
+        orcResumoArquivo = extrairResumoOrcamentoWorkbook(wb,file.name);
+        orcTexto = [textoResumoArquivoOrcamento(orcResumoArquivo), linhas.join("\n\n")].filter(Boolean).join("\n\n");
         salvarArquivoCarregado(file,"orcamento-prep",orcTexto,"").then(function(){ renderArquivosTodos(); });
         finalizarUploadOrc(file.name, orcTexto.length, zone);
       }catch(err){setOrcStatus("Erro ao ler Excel.", "#e84545");}
@@ -7247,7 +7364,7 @@ function exportarGastosCsv(){
 
 // ORC dentro de Obra
 function fOrcObraTipo(v,btn){orcObraTipo='completo';document.querySelectorAll("#ch-orc-obra-tipo .chip").forEach(function(b){b.classList.remove("on");});if(btn)btn.classList.add("on");}
-function processarOrcObra(input){processarArquivo(input,"orc-obra-input","orc-obra-zone","orc-obra-status","btn-orc-obra",function(txt,nome){orcObraTexto=txt;orcObraArquivoNome=nome||"";registrarHist("📊 Orçamento carregado: "+nome);});}
+function processarOrcObra(input){orcObraResumoArquivo=null;processarArquivo(input,"orc-obra-input","orc-obra-zone","orc-obra-status","btn-orc-obra",function(txt,nome,resumo){orcObraTexto=txt;orcObraArquivoNome=nome||"";orcObraResumoArquivo=resumo||orcObraResumoArquivo;registrarHist("📊 Orçamento carregado: "+nome);});}
 function copiarOrcObra(){
   var orcInstrucoes={
     "analise":"Analise esse orcamento de obra de construcao civil. Identifique o total geral, grupos/etapas, os principais itens por valor, compare com referencias SINAPI/SICRO vigentes, aponte alertas de sobrepreco e gere um relatorio HTML profissional.",
@@ -7266,6 +7383,7 @@ function copiarOrcObra(){
 function resetOrcObra(){
   orcObraTexto="";
   orcObraTipo="completo";
+  orcObraResumoArquivo=null;
   document.getElementById("orc-obra-status").textContent="";
   document.getElementById("btn-orc-obra").disabled=true;
   document.getElementById("orc-obra-copy-status").textContent="";
@@ -7317,6 +7435,8 @@ function registrarHist(txt){
 function processarArquivo(input,inputId,zoneId,statusId,btnId,cb){
   var file=input.files[0]; if(!file)return;
   var nome=file.name.toLowerCase();
+  var isOrcamento = inputId.indexOf("orc")>=0;
+  var resumoArquivo = null;
   var zone=document.getElementById(zoneId);
   document.getElementById(statusId).textContent="Lendo arquivo...";
   zone.style.borderColor="#0057b7";
@@ -7325,7 +7445,7 @@ function processarArquivo(input,inputId,zoneId,statusId,btnId,cb){
     zone.style.borderColor="#00c896";
     document.getElementById(statusId).textContent="Carregado! Escolha o tipo e clique em Analisar IA.";
     document.getElementById(btnId).disabled=false;
-    cb(txt,file.name);
+    cb(txt,file.name,resumoArquivo);
     var modArquivo = inputId.indexOf("orc-obra")>=0 ? "orcamento-obra" : (inputId.indexOf("proj-obra")>=0 ? "projeto-obra" : "geral");
     salvarArquivoCarregado(file,modArquivo,txt,obraAtual).then(function(){ renderArquivosTodos(); });
     input.value="";
@@ -7338,7 +7458,7 @@ function processarArquivo(input,inputId,zoneId,statusId,btnId,cb){
   } else if(nome.endsWith(".xlsx")||nome.endsWith(".xls")){
     if(typeof XLSX==="undefined"){document.getElementById(statusId).textContent="XLSX não carregou.";return;}
     var r2=new FileReader();
-    r2.onload=function(e){try{var wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});var ls=[];wb.SheetNames.forEach(function(sn){ls.push("=== "+sn+" ===\n"+XLSX.utils.sheet_to_csv(wb.Sheets[sn]));});fin(ls.join("\n\n"));}catch(err){document.getElementById(statusId).textContent="Erro ao ler Excel.";}};
+    r2.onload=function(e){try{var wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});var ls=[];wb.SheetNames.forEach(function(sn){ls.push("=== "+sn+" ===\n"+XLSX.utils.sheet_to_csv(wb.Sheets[sn]));});resumoArquivo = isOrcamento ? extrairResumoOrcamentoWorkbook(wb,file.name) : null;fin([textoResumoArquivoOrcamento(resumoArquivo), ls.join("\n\n")].filter(Boolean).join("\n\n"));}catch(err){document.getElementById(statusId).textContent="Erro ao ler Excel.";}}; 
     r2.readAsArrayBuffer(file);
   } else if(nome.endsWith(".csv")){
     var r3=new FileReader();r3.onload=function(e){fin(e.target.result);};r3.readAsText(file,"UTF-8");
@@ -8926,6 +9046,7 @@ function normalizarAnaliseOrcamento(j){
   j = j || {};
   if(j.resultado && typeof j.resultado === 'object') j = j.resultado;
   if(j.analise && typeof j.analise === 'object') j = j.analise;
+  var resumoArquivo = j.__resumo_arquivo || null;
 
   var alertas = asList(firstVal(j.alertas, j.pontos_atencao, j.pontos_de_atencao, j.riscos, [])).map(normalizarAlertaOrc);
   var resumo = j.resumo && typeof j.resumo === 'object' ? j.resumo : {};
@@ -8953,6 +9074,7 @@ function normalizarAnaliseOrcamento(j){
   norm.materiais = asList(j.materiais);
   norm.equipamentos = asList(j.equipamentos);
   norm.insumos = asList(j.insumos);
+  if(resumoArquivo) norm = aplicarResumoArquivoOrcamento(norm,resumoArquivo);
   return norm;
 }
 function renderListaObjetosOrc(titulo, lista, campos){
@@ -9047,6 +9169,7 @@ salvarHistoricoOrcObra = function(j){
 
 importOrcObra = function(j){
   if(!obraAtual) throw new Error('Abra uma obra antes de salvar análise de orçamento no histórico.');
+  j = aplicarResumoArquivoOrcamento(j, orcObraResumoArquivo);
   j = normalizarAnaliseOrcamento(j);
   salvarHistoricoOrcObra(j);
   renderAnaliseOrc(j);
@@ -9130,6 +9253,7 @@ function salvarHistoricoOrcGeral(j){
 }
 
 function importOrcamentoGeral(j){
+  j = aplicarResumoArquivoOrcamento(j, orcResumoArquivo);
   j = normalizarAnaliseOrcamento(j || {});
   salvarHistoricoOrcGeral(j);
   renderAnaliseOrcGeral(j);
