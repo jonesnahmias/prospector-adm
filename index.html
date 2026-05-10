@@ -7914,6 +7914,32 @@ function obraAtualIA(){
   return getObras().find(function(x){return x.id===obraAtual;}) || null;
 }
 
+function dadosConfiaveisModuloIA(modulo){
+  modulo = normalizarModuloImport(modulo);
+  var obra = obraAtualIA();
+  var truth = {motor:'engenharia-v2'};
+  if(obra){
+    truth.obra = {
+      id: obra.id || '',
+      nome: obra.nome || '',
+      tipo: obra.tipo || '',
+      local: obra.local || '',
+      endereco: obra.end || '',
+      valor_base: obra.valor || '',
+      valor_contratado: obra.contrato || '',
+      area: obra.area || '',
+      inicio: obra.inicio || '',
+      fim: obra.fim || '',
+      cliente: obra.cliente || '',
+      contrato_processo: obra.processo || '',
+      descricao: String(obra.desc || '').slice(0, 5000)
+    };
+  }
+  if(modulo === 'orc-obra' && orcObraResumoArquivo) truth.orcamento = orcObraResumoArquivo;
+  if(modulo === 'orcamento-geral' && orcResumoArquivo) truth.orcamento = orcResumoArquivo;
+  return truth;
+}
+
 function regrasTecnicasObrigatoriasIA(obra){
   obra = obra || {};
   var texto = [obra.nome, obra.tipo, obra.local, obra.end, obra.desc].filter(Boolean).join(' ');
@@ -8161,9 +8187,9 @@ async function analisarModuloIA(modulo,btn){
       maxTokens = 2800;
       timeoutMs = 14000;
     }
-    setStatusModuloIA(modulo,'Analisando com IA...','#4a90d9');
+    setStatusModuloIA(modulo,'Analisando com Motor Engenharia v2...','#4a90d9');
     if(btn){btn.disabled=true;btn.textContent='⏳ Analisando...';}
-    var payload = {modulo:modulo,prompt:prompt,max_output_tokens:maxTokens};
+    var payload = {modulo:modulo,prompt:prompt,max_output_tokens:maxTokens,engineering_v2:true,truth:dadosConfiaveisModuloIA(modulo)};
     if(timeoutMs) payload.timeout_ms = timeoutMs;
     var j;
     try{
