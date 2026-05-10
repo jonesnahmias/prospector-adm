@@ -784,15 +784,15 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
     </div>
 
     <div id="campo-diario-area" style="display:none">
-      <div class="campo-card" style="border-color:#1e3a5f">
+      <div class="campo-card" id="campo-consulta-zone" style="border-color:#1e3a5f">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
           <div>
             <div class="campo-card-title" style="margin-bottom:3px">📁 Documentos de Consulta da Obra</div>
             <div style="font-size:11px;color:#8a9bb0;line-height:1.55">Projetos e orçamentos ficam salvos na obra para consulta em qualquer dia. Não fazem parte do diário e não entram na impressão.</div>
           </div>
           <div style="display:flex;gap:7px;flex-wrap:wrap">
-            <button class="campo-btn grey" onclick="document.getElementById('campo-consulta-proj-input').click()">📐 Incluir projeto</button>
-            <button class="campo-btn grey" onclick="document.getElementById('campo-consulta-orc-input').click()">📊 Incluir orçamento</button>
+            <button class="campo-btn grey" id="campo-consulta-proj-zone" onclick="document.getElementById('campo-consulta-proj-input').click()">📐 Incluir projeto</button>
+            <button class="campo-btn grey" id="campo-consulta-orc-zone" onclick="document.getElementById('campo-consulta-orc-input').click()">📊 Incluir orçamento</button>
           </div>
         </div>
         <input type="file" id="campo-consulta-proj-input" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.dwg,.dxf,.doc,.docx" multiple style="display:none" onchange="campoAdicionarDocConsulta(this,'projetos')"/>
@@ -835,7 +835,7 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
         <div style="margin-top:10px"><div class="campo-label">Ocorrências</div><textarea class="campo-input" id="campo-ocorrencias" placeholder="Problemas, interferências, chuvas, atrasos, acidentes, glosas, fiscalização etc."></textarea></div>
         <div style="margin-top:10px"><div class="campo-label">Observações</div><textarea class="campo-input" id="campo-obs"></textarea></div>
         <!-- Projetos e orçamentos ficam nos Documentos de Consulta da Obra, fora do registro diário. -->
-        <div style="margin-top:10px">
+        <div id="campo-foto-zone" style="margin-top:10px">
           <div class="campo-label">Fotos do dia</div>
           <input type="file" id="campo-foto-input" accept="image/*" multiple style="display:none" onchange="campoAdicionarFotos(this)"/>
           <button class="campo-btn grey" onclick="document.getElementById('campo-foto-input').click()">📷 Adicionar fotos</button>
@@ -1094,7 +1094,7 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
       </div>
       <div id="sub-perfil">
         <p class="hint">Preencha o perfil da sua empresa. Os dados são salvos no servidor e usados para qualificar sua participação em editais.</p>
-        <div class="perfil-logo-card">
+        <div class="perfil-logo-card" id="perfil-logo-zone">
           <div class="perfil-logo-preview" id="perfil-logo-preview">🏢</div>
           <div style="flex:1;min-width:0">
             <div class="perfil-logo-title">Logotipo da Empresa</div>
@@ -1833,7 +1833,7 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
         </div>
       </div>
 
-      <div class="diario-docs-box" style="margin-bottom:16px;border-style:solid;background:#0d1b2a;border-color:#4a1a8a;border-left:4px solid #7c3aed">
+      <div class="diario-docs-box" id="cron-arquivo-zone" style="margin-bottom:16px;border-style:solid;background:#0d1b2a;border-color:#4a1a8a;border-left:4px solid #7c3aed">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
           <div>
             <div style="font-size:13px;font-weight:800;color:#e8f4ff">📁 Arquivo do Cronograma da Obra</div>
@@ -2062,7 +2062,7 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
           <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><textarea class="nota-area" id="gasto-obs" rows="2" placeholder="Ex: Comprovante anexado, pagamento parcial, condição negociada..."></textarea></div>
         </div>
 
-        <div style="margin-top:12px;border:1px dashed #1e3a5f;border-radius:10px;padding:12px;background:#071828">
+        <div id="gasto-anexo-zone" style="margin-top:12px;border:1px dashed #1e3a5f;border-radius:10px;padding:12px;background:#071828">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
             <div>
               <div style="font-size:12px;font-weight:800;color:#e8f4ff">📎 Anexos do gasto</div>
@@ -2107,15 +2107,15 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
       </div>
 
       <!-- Documentos fixos de consulta da obra: fora do corpo do diário -->
-      <div class="diario-docs-box" style="margin-bottom:16px;border-style:solid;background:#0d1b2a">
+      <div class="diario-docs-box" id="di-consulta-zone" style="margin-bottom:16px;border-style:solid;background:#0d1b2a">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
           <div>
             <div style="font-size:13px;font-weight:800;color:#e8f4ff">📁 Documentos de Consulta da Obra</div>
             <div class="diario-docs-note">Projetos e orçamentos ficam salvos de forma fixa na obra para consulta em qualquer dia. Eles não pertencem a um registro diário e não entram na impressão do Diário de Obra.</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button type="button" class="diario-mini-btn blue" onclick="document.getElementById('di-consulta-proj-input').click()">📐 Incluir Projeto</button>
-            <button type="button" class="diario-mini-btn green" onclick="document.getElementById('di-consulta-orc-input').click()">📊 Incluir Orçamento</button>
+            <button type="button" class="diario-mini-btn blue" id="di-consulta-proj-zone" onclick="document.getElementById('di-consulta-proj-input').click()">📐 Incluir Projeto</button>
+            <button type="button" class="diario-mini-btn green" id="di-consulta-orc-zone" onclick="document.getElementById('di-consulta-orc-input').click()">📊 Incluir Orçamento</button>
           </div>
         </div>
         <input type="file" id="di-consulta-proj-input" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.dwg,.dxf,.doc,.docx" multiple style="display:none" onchange="adicionarDocConsultaObra(this,'projetos')"/>
@@ -2287,7 +2287,7 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
         <div id="proj-ia-apoio-status" style="font-size:11px;color:#8a9bb0;margin-top:8px;line-height:1.5">O prompt usará os dados já salvos/carregados na obra, quando existirem.</div>
       </div>
 
-      <div class="tbox" style="border-left-color:#c084fc;margin-bottom:14px">
+      <div class="tbox" id="proj-foto-zone" style="border-left-color:#c084fc;margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:8px">
           <div>
             <div class="ttitle" style="color:#c084fc">📷 Fotos de Apoio da Análise</div>
@@ -3426,6 +3426,99 @@ document.addEventListener("DOMContentLoaded",function(){
     });
   }
 });
+
+function aplicarArquivosNoInput(input, files){
+  if(!input || !files || !files.length) return false;
+  var dt = new DataTransfer();
+  Array.from(files).forEach(function(file,i){
+    if(input.multiple || i===0) dt.items.add(file);
+  });
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+  return true;
+}
+
+function realcarDropZone(zone, ativo){
+  if(!zone) return;
+  if(!zone.dataset.dropBorderOriginal) zone.dataset.dropBorderOriginal = zone.style.borderColor || '';
+  if(!zone.dataset.dropBgOriginal) zone.dataset.dropBgOriginal = zone.style.background || '';
+  zone.style.borderColor = ativo ? '#00c896' : zone.dataset.dropBorderOriginal;
+  zone.style.background = ativo ? '#0d2a47' : zone.dataset.dropBgOriginal;
+}
+
+function vincularDropUpload(zoneId,inputId,opts){
+  var zone = document.getElementById(zoneId);
+  var input = document.getElementById(inputId);
+  if(!zone || !input || zone.dataset.dropUploadBind) return;
+  opts = opts || {};
+  zone.dataset.dropUploadBind = '1';
+  zone.title = (zone.title ? zone.title+' | ' : '') + 'Arraste e solte arquivos aqui';
+  zone.addEventListener('dragover',function(e){
+    if(!e.dataTransfer || !e.dataTransfer.files) return;
+    e.preventDefault();
+    e.stopPropagation();
+    realcarDropZone(zone,true);
+  });
+  zone.addEventListener('dragleave',function(e){
+    e.preventDefault();
+    realcarDropZone(zone,false);
+  });
+  zone.addEventListener('drop',function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    realcarDropZone(zone,false);
+    var ok = aplicarArquivosNoInput(input,e.dataTransfer.files);
+    if(ok && opts.statusId){
+      var st = document.getElementById(opts.statusId);
+      if(st){ st.style.color = '#00c896'; st.textContent = 'Arquivo recebido por arrastar e soltar.'; }
+    }
+  });
+}
+
+function vincularDropConsultaAuto(zoneId,projInputId,orcInputId,statusId){
+  var zone = document.getElementById(zoneId);
+  var proj = document.getElementById(projInputId);
+  var orc = document.getElementById(orcInputId);
+  if(!zone || !proj || !orc || zone.dataset.dropUploadBind) return;
+  zone.dataset.dropUploadBind = '1';
+  zone.title = (zone.title ? zone.title+' | ' : '') + 'Arraste arquivos aqui; planilhas/CSV vao para Orcamento e os demais para Projeto';
+  zone.addEventListener('dragover',function(e){ if(!e.dataTransfer || !e.dataTransfer.files) return; e.preventDefault(); realcarDropZone(zone,true); });
+  zone.addEventListener('dragleave',function(e){ e.preventDefault(); realcarDropZone(zone,false); });
+  zone.addEventListener('drop',function(e){
+    e.preventDefault();
+    realcarDropZone(zone,false);
+    var arquivos = Array.from(e.dataTransfer.files||[]);
+    var arquivosOrc = arquivos.filter(function(f){return /\.(xlsx?|csv|ods)$/i.test(f.name||'');});
+    var arquivosProj = arquivos.filter(function(f){return !/\.(xlsx?|csv|ods)$/i.test(f.name||'');});
+    if(arquivosProj.length) aplicarArquivosNoInput(proj,arquivosProj);
+    if(arquivosOrc.length) aplicarArquivosNoInput(orc,arquivosOrc);
+    var st = statusId ? document.getElementById(statusId) : null;
+    if(st){ st.style.color = '#00c896'; st.textContent = 'Arquivos recebidos por arrastar e soltar.'; }
+  });
+}
+
+function configurarDropUploadsApp(){
+  [
+    ['perfil-logo-zone','p-logo-file','pstatus'],
+    ['orc-obra-zone','orc-obra-input','orc-obra-status'],
+    ['proj-obra-zone','proj-obra-input','proj-obra-status'],
+    ['proj-foto-zone','proj-foto-input','proj-foto-status'],
+    ['proj-fotos-grid','proj-foto-input','proj-foto-status'],
+    ['cron-arquivo-zone','cron-arquivo-input','cron-arquivo-status'],
+    ['gasto-anexo-zone','gasto-anexo-input','gasto-anexo-status'],
+    ['di-foto-grid','di-foto-input','di-foto-status'],
+    ['campo-foto-zone','campo-foto-input','campo-form-status'],
+    ['campo-foto-grid','campo-foto-input','campo-form-status'],
+    ['di-consulta-proj-zone','di-consulta-proj-input','di-consulta-status'],
+    ['di-consulta-orc-zone','di-consulta-orc-input','di-consulta-status'],
+    ['campo-consulta-proj-zone','campo-consulta-proj-input','campo-consulta-status'],
+    ['campo-consulta-orc-zone','campo-consulta-orc-input','campo-consulta-status']
+  ].forEach(function(item){vincularDropUpload(item[0],item[1],{statusId:item[2]});});
+  vincularDropConsultaAuto('di-consulta-zone','di-consulta-proj-input','di-consulta-orc-input','di-consulta-status');
+  vincularDropConsultaAuto('campo-consulta-zone','campo-consulta-proj-input','campo-consulta-orc-input','campo-consulta-status');
+}
+
+document.addEventListener('DOMContentLoaded',configurarDropUploadsApp);
 
 // ==================== PROJETO ====================
 var projTexto = "";
