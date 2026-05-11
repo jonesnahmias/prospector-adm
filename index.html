@@ -8264,6 +8264,95 @@ function gerarDimensionamentoLocalEngenhariaV2(){
   };
 }
 
+function gerarAnaliseProjetoLocalEngenhariaV2(){
+  var ctx = contextoObraLocalEngenhariaV2();
+  var obra = ctx.obra;
+  var texto = String(projObraTexto || '') + '\n' + [obra.nome,obra.tipo,obra.local,obra.end,obra.desc].filter(Boolean).join('\n');
+  var t = texto.toLowerCase();
+  var pav = ctx.pav;
+  var reforma = /reforma|recupera|adequacao|adequação|demol|existente|patologia|paiol|base aerea|base aérea/i.test(texto);
+  var areaTxt = obra.area ? (obra.area + ' m2') : '';
+  if(!areaTxt){
+    var ma = texto.match(/(?:area|área|m2|m²)[^\d]{0,12}([\d.,]+)\s*(?:m2|m²)?/i);
+    if(ma) areaTxt = ma[1] + ' m2';
+  }
+  var pavimentos = '';
+  var mp = texto.match(/(\d+)\s*(?:pavimentos|pav\.|andares)/i);
+  if(mp) pavimentos = mp[1];
+  else if(/terreo|térreo/i.test(texto)) pavimentos = '1';
+  var estrutural = pav ? 'Pavimentacao/infraestrutura viaria; validar terraplenagem, base, revestimento asfaltico e drenagem.' :
+    (/metal|aço|aco|trelica|treliça/i.test(texto) ? 'Estrutura metalica ou elementos metalicos identificados; validar projeto estrutural e ligações.' :
+    (/concreto|pilar|viga|laje|fundacao|fundação/i.test(texto) ? 'Concreto armado/estrutura convencional indicada; validar fundacoes, vigas, pilares e lajes.' :
+    'Sistema estrutural nao conclusivo pelo texto extraido; exigir plantas e memoriais complementares.'));
+  var ambientes = [];
+  ['sala','banheiro','sanitario','depósito','deposito','circulacao','circulação','cobertura','fachada','piso','parede','paiol','escritorio','escritório'].forEach(function(k){
+    if(t.indexOf(k.toLowerCase()) >= 0) ambientes.push({ambiente:k,observacao:'Identificado no texto/fotos de apoio; confirmar dimensoes em planta.'});
+  });
+  if(!ambientes.length && reforma) ambientes = [
+    {ambiente:'Edificacao existente',observacao:'Analisar levantamento cadastral, patologias, demolicoes e recomposicoes.'},
+    {ambiente:'Areas internas e externas de intervencao',observacao:'Conferir fotos, cortes, plantas e memoriais.'}
+  ];
+  if(pav) ambientes = [
+    {ambiente:'Trecho viario / acesso / pavimento',observacao:'Conferir extensao, largura, greide, drenagem e secoes tipo.'},
+    {ambiente:'Areas de apoio e sinalizacao',observacao:'Prever circulacao de equipamentos, isolamento e controle de trafego.'}
+  ];
+  var etapas = pav ? [
+    {etapa:'Levantamento/topografia e validacao do greide',duracao_estimada:'1 a 2 semanas',dependencias:'Projetos, licencas e liberacao da area',recursos:'Topografia, encarregado e controle tecnologico'},
+    {etapa:'Terraplenagem, regularizacao, sub-base/base e drenagem',duracao_estimada:'2 a 5 semanas',dependencias:'Locacao e ensaios iniciais',recursos:'Motoniveladora, rolos, pa carregadeira, caminhao pipa e equipe de apoio'},
+    {etapa:'Imprimacao, pintura de ligacao e CBUQ/CAP',duracao_estimada:'1 a 3 semanas',dependencias:'Base liberada por ensaios',recursos:'Espargidor, vibroacabadora, rolo tandem, rolo pneumatico e basculantes'},
+    {etapa:'Sinalizacao, ensaios, arremates e entrega',duracao_estimada:'1 semana',dependencias:'Revestimento aceito',recursos:'Laboratorio, topografia e equipe de acabamento'}
+  ] : [
+    {etapa:'Levantamento cadastral, compatibilizacao e plano de ataque',duracao_estimada:'1 semana',dependencias:'Projeto completo, fotos e vistoria',recursos:'Engenheiro/RT, mestre e levantamento de campo'},
+    {etapa:'Demolicoes, remocoes, protecoes e preparacao das frentes',duracao_estimada:'1 a 3 semanas',dependencias:'Liberacao das areas',recursos:'Equipe civil, cacamba, ferramentas e EPCs'},
+    {etapa:'Intervencoes estruturais, alvenarias, instalacoes e recomposicoes',duracao_estimada:'2 a 8 semanas',dependencias:'Projetos compatibilizados',recursos:'Pedreiros, eletrica/hidraulica, controle de qualidade'},
+    {etapa:'Revestimentos, acabamentos, testes e entrega',duracao_estimada:'2 a 6 semanas',dependencias:'Frentes liberadas e materiais comprados',recursos:'Acabadores, pintores, limpeza, testes e documentacao'}
+  ];
+  var materiais = pav ? [
+    {material:'CBUQ/CAP/emulsao',observacao:'Confirmar traço, taxa de aplicacao, DMT, temperatura e fornecedor/usina.'},
+    {material:'Agregados/base/sub-base',observacao:'Confirmar jazida, granulometria, compactacao e ensaios.'},
+    {material:'Materiais de drenagem e sinalizacao',observacao:'Conferir compatibilidade com projeto e normas.'}
+  ] : [
+    {material:'Materiais de recomposicao civil',observacao:'Conferir quantitativos nas plantas e fotos de patologias.'},
+    {material:'Instalacoes eletricas/hidraulicas',observacao:'Validar interferencias, cargas, pontos, prumadas e normas.'},
+    {material:'Acabamentos, pintura, impermeabilizacao e esquadrias',observacao:'Confirmar padrao, especificacao, perdas e prazo de compra.'}
+  ];
+  var riscos = pav ? [
+    {risco:'Projeto sem detalhamento suficiente de base, CBUQ/CAP, drenagem ou controle tecnologico',probabilidade:'media',impacto:'alto',mitigacao:'Exigir secoes tipo, memoriais, ensaios e plano de rolagem antes da proposta.'},
+    {risco:'Logistica de usina/transporte e temperatura do CBUQ nao definida',probabilidade:'media',impacto:'alto',mitigacao:'Fechar DMT, frota, fornecedor e janela de aplicacao.'}
+  ] : [
+    {risco:'Incompatibilidade entre fotos, levantamento existente e projeto extraido do PDF',probabilidade:'media',impacto:'alto',mitigacao:'Realizar vistoria e compatibilizacao antes de fechar prazo/custo.'},
+    {risco:'Servicos ocultos em reforma nao refletidos no projeto',probabilidade:'media',impacto:'alto',mitigacao:'Criar contingencia tecnica e registrar premissas/exclusoes.'},
+    {risco:'Instalacoes e acabamentos sem especificacao completa',probabilidade:'media',impacto:'medio',mitigacao:'Solicitar memorial, quadro de esquadrias e especificacoes por ambiente.'}
+  ];
+  var alertas = [
+    {tipo:'FALLBACK_LOCAL',item:'Analise de projeto',detalhe:'A IA externa demorou; o app gerou esta analise tecnica local para nao deixar o modulo sem resposta.'},
+    {tipo:'VALIDACAO_TECNICA',item:'Fonte do projeto',detalhe:'Confirmar dados em plantas originais, cortes, memoriais, fotos e vistoria de campo.'}
+  ];
+  if((typeof fotosProjetoApoio !== 'undefined') && Array.isArray(fotosProjetoApoio) && fotosProjetoApoio.length){
+    alertas.push({tipo:'FOTOS_APOIO',item:'Fotos de apoio',detalhe:fotosProjetoApoio.length+' foto(s) anexada(s); usar para validar patologias, acesso, fachada, instalacoes e estado existente.'});
+  }
+  return {
+    tipo_obra: pav ? 'Pavimentacao / infraestrutura viaria' : (reforma ? 'Reforma / adequacao de edificacao existente' : (obra.tipo || 'Obra de construcao civil')),
+    area_total: areaTxt || 'Nao identificada no texto extraido',
+    padrao: /alto|luxo|padrao alto|padrão alto/i.test(texto) ? 'Padrao alto' : (/baixo|simples|economico/i.test(texto) ? 'Padrao economico/simples' : 'Padrao a confirmar por memorial'),
+    pavimentos: pavimentos || (pav ? 'Nao aplicavel' : 'Nao identificado'),
+    sistema_estrutural: estrutural,
+    estimativa_custo: ctx.total ? ('R$ '+Number(ctx.total).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})) : 'Usar orcamento/análise de orcamento vinculada para custo confiavel',
+    ambientes: ambientes,
+    esquadrias: reforma && !pav ? [{tipo:'Portas/janelas/esquadrias',dimensoes:'A confirmar em planta/quadro',material:'A confirmar',quantidade:0,observacao:'Necessario quadro de esquadrias ou levantamento in loco.'}] : [],
+    etapas_execucao: etapas,
+    materiais: materiais,
+    riscos: riscos,
+    alertas: alertas,
+    recomendacoes: [
+      'Solicitar/validar plantas completas, cortes, fachadas, memoriais, ART/RRT e especificacoes antes da execucao.',
+      'Cruzar projeto com orcamento e cronograma para identificar servicos omitidos, interferencias e itens de maior risco.',
+      pav ? 'Para CBUQ/asfalto, nao fechar planejamento sem base liberada, controle tecnologico, usina/transporte e equipamentos definidos.' : 'Para reforma, realizar vistoria tecnica detalhada e registrar premissas de demolicao, recuperacao e recomposicao.'
+    ],
+    _motor_v2:{versao:'engenharia-v2-local',motivo:'fallback de projeto apos timeout do provedor IA'}
+  };
+}
+
 function importarResultadoModuloIA(modulo,json){
   modulo = normalizarModuloImport(modulo);
   if(modulo==='orcamento-geral') return importOrcamentoGeral(json);
@@ -8405,6 +8494,9 @@ async function analisarModuloIA(modulo,btn){
       if((modulo==='orc-obra' || modulo==='orcamento-geral') && resumoOrcAtual && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
         setStatusModuloIA(modulo,'A IA demorou. Gerando analise local confiavel com os dados extraidos da planilha...','#f5c842');
         j = {json:criarAnaliseOrcamentoArquivo(resumoOrcAtual)};
+      }else if(modulo==='proj-obra' && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
+        setStatusModuloIA(modulo,'A IA demorou. Gerando analise de projeto local com Motor Engenharia v2...','#f5c842');
+        j = {json:gerarAnaliseProjetoLocalEngenhariaV2()};
       }else if(modulo==='plan' && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
         setStatusModuloIA(modulo,'A IA demorou. Gerando planejamento local com Motor Engenharia v2...','#f5c842');
         j = {json:gerarPlanejamentoLocalEngenhariaV2()};
