@@ -738,6 +738,20 @@ html.theme-gray .finance-dash-kpi,html.theme-gray .financeiro-card-kpi{backgroun
 html.theme-gray .finance-dash-val,html.theme-gray .financeiro-card-v,html.theme-gray .financeiro-total-val{color:#f8fafc}
 html.theme-gray .finance-dash-alert{background:#252a31;border-color:#4b5563;color:#d8dde3}
 html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;color:#f4f6f8}
+.consulta-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:14px}
+.consulta-panel{background:#0d1b2a;border:1px solid #1e3a5f;border-radius:10px;padding:14px}
+.consulta-title{font-size:15px;font-weight:900;color:#00c896;margin-bottom:5px}
+.consulta-sub{font-size:12px;color:#8a9bb0;line-height:1.55;margin-bottom:12px}
+.consulta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.consulta-result{margin-top:14px;background:#071828;border:1px solid #1e3a5f;border-left:4px solid #00c896;border-radius:10px;padding:14px}
+.consulta-resposta{font-size:13px;color:#d8ecff;line-height:1.7;margin-bottom:10px}
+.consulta-hist-item{background:#071828;border:1px solid #1e3a5f;border-radius:9px;padding:10px;margin-bottom:8px}
+.consulta-hist-title{font-size:12px;color:#e8f4ff;font-weight:900;line-height:1.35}
+.consulta-hist-meta{font-size:10px;color:#4a6a8a;margin-top:4px}
+html.theme-light .consulta-panel,html.theme-light .consulta-result,html.theme-light .consulta-hist-item{background:#ffffff;border-color:#d5e4f4;color:#1f2d3d}
+html.theme-light .consulta-resposta,html.theme-light .consulta-hist-title{color:#1f2d3d}
+html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray .consulta-hist-item{background:#1b222a;border-color:#3b4652;color:#d8dde3}
+@media(max-width:900px){.consulta-layout,.consulta-grid{grid-template-columns:1fr}}
 
 </style>
 <script>
@@ -2505,6 +2519,74 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
 <!-- ═══════════════════════════════════════════════ -->
 <!-- SEÇÃO — FINANCEIRO INDEPENDENTE                -->
 <!-- ═══════════════════════════════════════════════ -->
+<!-- SECAO - CONSULTA TECNICA -->
+<div id="sec-consulta" class="section">
+  <div class="content">
+    <div class="consulta-layout">
+      <div class="consulta-panel">
+        <div class="consulta-title">Consulta Tecnica de Engenharia</div>
+        <div class="consulta-sub">Pesquise uso de materiais, especificacoes, alternativas, criterios de qualidade, custos de referencia e textos para memorial/orcamento.</div>
+        <div class="fg">
+          <label class="fl">Pergunta ou item</label>
+          <textarea class="fi" id="consulta-pergunta" rows="5" placeholder="Ex: Qual material usar para impermeabilizar laje exposta? / Especificacao tecnica para CBUQ faixa C / custo de manta asfaltica"></textarea>
+        </div>
+        <div class="consulta-grid">
+          <div class="fg">
+            <label class="fl">Tipo de consulta</label>
+            <select class="fi" id="consulta-tipo">
+              <option value="duvida">Duvida tecnica</option>
+              <option value="material">Sugestao de material</option>
+              <option value="especificacao">Especificacao tecnica</option>
+              <option value="custo">Custo / referencia</option>
+              <option value="comparacao">Comparacao de solucoes</option>
+              <option value="norma">Normas / controle</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">Area</label>
+            <select class="fi" id="consulta-area">
+              <option value="geral">Geral</option>
+              <option value="reforma">Reforma / manutencao</option>
+              <option value="pavimentacao">Pavimentacao / CBUQ / CAP</option>
+              <option value="estrutura">Estrutura / concreto</option>
+              <option value="impermeabilizacao">Impermeabilizacao</option>
+              <option value="instalacoes">Instalacoes eletricas/hidraulicas</option>
+              <option value="acabamentos">Acabamentos</option>
+              <option value="drenagem">Drenagem / infraestrutura</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">UF / regiao</label>
+            <input class="fi" id="consulta-uf" placeholder="Ex: SC, AM, RS"/>
+          </div>
+          <div class="fg">
+            <label class="fl">Fonte de custo</label>
+            <select class="fi" id="consulta-fonte">
+              <option value="referencial">Referencial tecnico, sem inventar preco</option>
+              <option value="sinapi">Priorizar SINAPI/SICRO/ORCC</option>
+              <option value="cotacao">Orientar cotacao de mercado</option>
+              <option value="memorial">Gerar texto para memorial/orcamento</option>
+            </select>
+          </div>
+        </div>
+        <div class="btns" style="margin-top:12px">
+          <button class="bai" id="btn-consulta-ia" onclick="consultarTecnicaIA()" style="background:linear-gradient(135deg,#005f20,#00c896);color:#001;font-weight:900">Consultar IA</button>
+          <button class="bai" onclick="copiarPromptConsultaTecnica()" style="background:linear-gradient(135deg,#0057b7,#00a8e8)">Copiar Prompt</button>
+          <button class="bai" onclick="renderHistoricoConsultaTecnica(true)" style="background:linear-gradient(135deg,#3b2f00,#f5c842);color:#000">Historico</button>
+          <button class="bai grey" onclick="limparConsultaTecnica()">Limpar</button>
+        </div>
+        <div id="consulta-status" style="font-size:12px;color:#4a90d9;margin-top:8px;min-height:16px"></div>
+        <div id="consulta-result"></div>
+      </div>
+      <div class="consulta-panel">
+        <div class="consulta-title" style="color:#f5c842">Biblioteca tecnica</div>
+        <div class="consulta-sub">As consultas ficam salvas neste ambiente para reaproveitar especificacoes, respostas e referencias em obras futuras.</div>
+        <div id="consulta-hist-box"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="sec-financeiro" class="section">
   <div class="financeiro-page">
     <div class="financeiro-hero">
@@ -2553,6 +2635,10 @@ html.theme-gray .theme-palette-toggle{background:#262d35;border-color:#596574;co
     <button class="bnav-btn" id="bn-financeiro" onclick="navFinanceiro()" title="Financeiro">
       <span class="bnav-icon">💰</span>
       <span class="bnav-label">Financeiro</span>
+    </button>
+    <button class="bnav-btn" id="bn-consulta" onclick="navSec('consulta',this)" title="Consulta Tecnica">
+      <span class="bnav-icon">🧪</span>
+      <span class="bnav-label">Consulta Tecnica</span>
     </button>
     <button class="bnav-btn" id="bn-empresa" onclick="navSec('empresa',this)" title="Empresa">
       <span class="bnav-icon">🏢</span>
@@ -7566,6 +7652,193 @@ function navSec(id,btn){
   if(id==="home") atualizarDashboardHome();
   if(id==="obras") renderObras();
   if(id==="empresa"){ renderProf(); renderDadosEmpresa(); }
+  if(id==="consulta") renderHistoricoConsultaTecnica(false);
+}
+
+function consultaTecnicaKey(){
+  var emp = 'default';
+  try{
+    var u = typeof authUsuarioAtual === 'function' ? authUsuarioAtual() : null;
+    emp = (u && u.empresaId) || (getPerfil() && getPerfil().cnpj) || 'default';
+  }catch(e){}
+  return 'sc_consulta_tecnica_'+String(emp).toLowerCase().replace(/[^a-z0-9_-]+/g,'_');
+}
+
+function consultaTecnicaLista(){
+  try{
+    var a = JSON.parse(localStorage.getItem(consultaTecnicaKey()) || '[]');
+    return Array.isArray(a) ? a : [];
+  }catch(e){ return []; }
+}
+
+function salvarConsultaTecnica(item){
+  var lista = consultaTecnicaLista();
+  lista.unshift(item);
+  localStorage.setItem(consultaTecnicaKey(), JSON.stringify(lista.slice(0,120)));
+  renderHistoricoConsultaTecnica(false);
+}
+
+function consultaTecnicaDados(){
+  return {
+    pergunta: (document.getElementById('consulta-pergunta')||{}).value || '',
+    tipo: (document.getElementById('consulta-tipo')||{}).value || 'duvida',
+    area: (document.getElementById('consulta-area')||{}).value || 'geral',
+    uf: (document.getElementById('consulta-uf')||{}).value || '',
+    fonte: (document.getElementById('consulta-fonte')||{}).value || 'referencial'
+  };
+}
+
+function promptConsultaTecnica(){
+  var d = consultaTecnicaDados();
+  if(!String(d.pergunta||'').trim()) throw new Error('Digite a pergunta ou item tecnico.');
+  return [
+    'Voce e um engenheiro civil senior, orcamentista e especificador tecnico no Brasil.',
+    'Responda de forma pratica para obra real, sem generalidades.',
+    'Se envolver preco/custo, NAO invente valor exato. Informe que deve ser validado por SINAPI/SICRO/ORCC/cotacao e descreva como orcar.',
+    'Se envolver produto/material, informe aplicacao, quando usar, quando nao usar, preparo de superficie/base, execucao, controle de qualidade, riscos e alternativas.',
+    'Se envolver especificacao, gere texto tecnico pronto para memorial/orcamento.',
+    'Retorne SOMENTE JSON valido sem markdown neste formato:',
+    '{"resposta_direta":"","aplicacao_recomendada":[],"quando_usar":[],"quando_nao_usar":[],"especificacao_tecnica":"","criterios_qualidade":[],"normas_referencias":[],"custo_referencia":{"orientacao":"","bases":[],"composicoes_sugeridas":[]},"alternativas":[],"riscos":[],"texto_memorial":"","proximos_passos":[],"alertas":[]}',
+    '',
+    'TIPO DE CONSULTA: '+d.tipo,
+    'AREA: '+d.area,
+    'UF/REGIAO: '+(d.uf||'nao informada'),
+    'FONTE DE CUSTO: '+d.fonte,
+    '',
+    'PERGUNTA/ITEM:',
+    d.pergunta
+  ].join('\n');
+}
+
+function gerarConsultaTecnicaLocal(d){
+  var q = String((d&&d.pergunta)||'').toLowerCase();
+  var pav = /cb[uú]q|asfalto|cap\b|pavimenta|base|sub-base|imprima|pintura de liga/i.test(q+' '+(d&&d.area));
+  var imp = /impermeabil|manta|infiltra|laje|umidade/i.test(q+' '+(d&&d.area));
+  var concreto = /concreto|graute|argamassa|fck|armadura|pilar|viga|laje/i.test(q+' '+(d&&d.area));
+  var resposta = pav ? 'Para pavimentacao/asfalto, a decisao tecnica deve validar camada, trafego, base/sub-base, drenagem, usina, transporte, aplicacao e compactacao.' :
+    (imp ? 'Para impermeabilizacao, escolha o sistema conforme exposicao, movimentacao da base, trafego, protecao mecanica e detalhamento dos ralos/rodapes.' :
+    (concreto ? 'Para concreto/argamassas/grautes, especifique desempenho, preparo da base, cura, controle tecnologico e compatibilidade com a solicitacao.' :
+    'A resposta depende do uso, substrato, ambiente, desempenho esperado, custo de ciclo de vida e disponibilidade local. Use a orientacao abaixo como base tecnica inicial.'));
+  return {
+    resposta_direta: resposta,
+    aplicacao_recomendada: pav ? ['Revestimento asfaltico, recuperacao de vias, acessos, patios e areas de trafego conforme projeto.'] : (imp ? ['Lajes, coberturas, areas molhadas, reservatorios ou paredes sujeitas a umidade, conforme sistema escolhido.'] : ['Aplicar quando o material atender ao desempenho requerido e estiver compatibilizado com projeto, memorial e execucao.']),
+    quando_usar: ['Quando houver especificacao tecnica clara, base preparada, equipe capacitada e controle de qualidade definido.'],
+    quando_nao_usar: ['Quando o substrato/base nao estiver regularizado, houver umidade/incompatibilidade nao tratada ou faltar criterio de medicao e aceitacao.'],
+    especificacao_tecnica: 'Especificar material/produto conforme finalidade, norma aplicavel, desempenho minimo, preparo da base, metodo executivo, consumo, perdas, criterio de medicao, ensaios e aceitacao.',
+    criterios_qualidade: pav ? ['Temperatura, espessura, compactacao, acabamento, granulometria, DMT, rastreabilidade e liberacao por ensaios.'] : ['Recebimento de material, validade/lote, preparo de superficie, consumo, cura/secagem, teste de aderencia/estanqueidade quando aplicavel e registro fotografico.'],
+    normas_referencias: ['Verificar normas ABNT aplicaveis, manuais do fabricante, SINAPI/SICRO/ORCC para composicoes e exigencias do edital/contrato.'],
+    custo_referencia: {orientacao:'Nao usar preco de IA como preco final. Montar composicao em SINAPI/SICRO/ORCC e confirmar por cotacao local.', bases:['SINAPI','SICRO','ORCC','cotacoes de fornecedores'], composicoes_sugeridas: pav ? ['CBUQ/CAP','transporte','imprimacao','pintura de ligacao','compactacao','ensaios'] : ['material principal','mao de obra','preparo da base','acessorios','perdas','equipamentos']},
+    alternativas: ['Comparar pelo custo total, vida util, manutencao, prazo de execucao, disponibilidade local e risco de retrabalho.'],
+    riscos: ['Escolha por menor preco sem compatibilidade tecnica.', 'Falta de preparo da base/substrato.', 'Omissao de ensaios, perdas, transporte ou equipamentos.'],
+    texto_memorial: 'Fornecimento e aplicacao de material/servico conforme especificacao do fabricante, normas tecnicas aplicaveis e projeto, incluindo preparo da base, mao de obra, ferramentas, perdas, limpeza, controle de qualidade e todos os insumos necessarios para perfeito funcionamento/aceite.',
+    proximos_passos: ['Validar projeto/memorial.', 'Checar composicao de custo em base oficial.', 'Solicitar ficha tecnica e cotacao.', 'Definir criterio de medicao e aceitacao.'],
+    alertas: ['Resposta local gerada porque a IA online nao concluiu. Use como orientacao inicial e valide tecnicamente antes de contratar/executar.'],
+    _motor_v2:{versao:'consulta-tecnica-local',provider:'local'}
+  };
+}
+
+function consultaListaHtml(titulo, arr, cor){
+  var lista = asList(arr);
+  if(!lista.length) return '';
+  return '<div class="lbox"><div class="ltitle" style="color:'+cor+'">'+escHTML(titulo)+'</div>'+lista.map(function(x){return '<div class="litem">• '+escHTML(textFromAny ? textFromAny(x) : editalValorTextoBruto(x))+'</div>';}).join('')+'</div>';
+}
+
+function renderConsultaTecnica(j){
+  j = j || {};
+  var html = '<div class="consulta-result">';
+  html += '<div class="consulta-title">Resposta tecnica</div>';
+  html += '<div class="consulta-resposta">'+escHTML(j.resposta_direta || j.resposta || j.resumo || 'Consulta respondida.')+'</div>';
+  html += '<div class="listas">';
+  html += consultaListaHtml('Aplicacao recomendada', j.aplicacao_recomendada || j.aplicacoes, '#00c896');
+  html += consultaListaHtml('Quando usar', j.quando_usar, '#4a90d9');
+  html += consultaListaHtml('Quando nao usar', j.quando_nao_usar, '#e84545');
+  html += consultaListaHtml('Criterios de qualidade', j.criterios_qualidade || j.controle_qualidade, '#f5c842');
+  html += consultaListaHtml('Normas / referencias', j.normas_referencias || j.normas, '#8ab4ff');
+  html += consultaListaHtml('Alternativas', j.alternativas, '#c084fc');
+  html += consultaListaHtml('Riscos', j.riscos || j.alertas, '#ff8a8a');
+  html += consultaListaHtml('Proximos passos', j.proximos_passos, '#00c896');
+  html += '</div>';
+  if(j.especificacao_tecnica) html += '<div class="tbox" style="margin-top:10px"><div class="ttitle">Especificacao tecnica</div><div style="font-size:12px;color:#c8d8e8;line-height:1.65;white-space:pre-wrap">'+escHTML(j.especificacao_tecnica)+'</div></div>';
+  if(j.custo_referencia){
+    html += '<div class="tbox" style="margin-top:10px;border-left-color:#f5c842"><div class="ttitle" style="color:#f5c842">Custo / referencia</div><div style="font-size:12px;color:#c8d8e8;line-height:1.65">'+escHTML(editalValorTextoBruto(j.custo_referencia))+'</div></div>';
+  }
+  if(j.texto_memorial) html += '<div class="tbox" style="margin-top:10px"><div class="ttitle">Texto para memorial/orcamento</div><textarea class="fi" rows="5" readonly>'+escHTML(j.texto_memorial)+'</textarea></div>';
+  html += "<div class=\"btns\" style=\"margin-top:10px\"><button class=\"bai\" onclick=\"salvarConsultaAtualBiblioteca()\" style=\"background:linear-gradient(135deg,#005f20,#00c896);color:#001\">Salvar na biblioteca</button><button class=\"bai grey\" onclick=\"copiarTextoClipboard((consultaAtualTecnica&&consultaAtualTecnica.texto_memorial)||JSON.stringify(consultaAtualTecnica,null,2),'#consulta-status','Copiado.')\">Copiar resposta</button></div>";
+  html += '</div>';
+  var el = document.getElementById('consulta-result');
+  if(el) el.innerHTML = html;
+}
+
+var consultaAtualTecnica = null;
+
+async function consultarTecnicaIA(){
+  var d = consultaTecnicaDados();
+  var st = document.getElementById('consulta-status');
+  var btn = document.getElementById('btn-consulta-ia');
+  if(!String(d.pergunta||'').trim()){ if(st){st.style.color='#e84545';st.textContent='Digite a pergunta ou item tecnico.';} return; }
+  if(st){st.style.color='#4a90d9';st.textContent='Consultando IA tecnica...';}
+  if(btn){btn.disabled=true;btn.textContent='Consultando...';}
+  try{
+    var r = await fetch('/api/ia-json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo:'consulta-tecnica',prompt:promptConsultaTecnica(),max_output_tokens:2800,timeout_ms:30000})});
+    var data = await r.json().catch(function(){return {};});
+    if(!r.ok || data.error) throw new Error(data.error || 'Falha na consulta tecnica.');
+    consultaAtualTecnica = data.json || data;
+    renderConsultaTecnica(consultaAtualTecnica);
+    salvarConsultaTecnica({id:genId(),data:dataHist(),pergunta:d.pergunta,tipo:d.tipo,area:d.area,uf:d.uf,json:consultaAtualTecnica});
+    if(st){st.style.color='#00c896';st.textContent='Consulta concluida e salva na biblioteca.';}
+  }catch(e){
+    consultaAtualTecnica = gerarConsultaTecnicaLocal(d);
+    renderConsultaTecnica(consultaAtualTecnica);
+    salvarConsultaTecnica({id:genId(),data:dataHist(),pergunta:d.pergunta,tipo:d.tipo,area:d.area,uf:d.uf,json:consultaAtualTecnica});
+    if(st){st.style.color='#f5c842';st.textContent='IA online nao concluiu. Gere uma resposta tecnica local para revisao.';}
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Consultar IA';}
+  }
+}
+
+function copiarPromptConsultaTecnica(){
+  try{copiarTextoClipboard(promptConsultaTecnica(),'#consulta-status','Prompt copiado.');}
+  catch(e){var st=document.getElementById('consulta-status'); if(st){st.style.color='#e84545';st.textContent=e.message;}}
+}
+
+function limparConsultaTecnica(){
+  var q=document.getElementById('consulta-pergunta'); if(q) q.value='';
+  var r=document.getElementById('consulta-result'); if(r) r.innerHTML='';
+  var st=document.getElementById('consulta-status'); if(st) st.textContent='';
+  consultaAtualTecnica=null;
+}
+
+function salvarConsultaAtualBiblioteca(){
+  if(!consultaAtualTecnica){return;}
+  var d=consultaTecnicaDados();
+  salvarConsultaTecnica({id:genId(),data:dataHist(),pergunta:d.pergunta||'Consulta tecnica',tipo:d.tipo,area:d.area,uf:d.uf,json:consultaAtualTecnica,favorito:true});
+  var st=document.getElementById('consulta-status'); if(st){st.style.color='#00c896';st.textContent='Resposta salva na biblioteca.';}
+}
+
+function renderHistoricoConsultaTecnica(toggle){
+  var box=document.getElementById('consulta-hist-box');
+  if(!box) return;
+  if(toggle && box.style.display === 'none') box.style.display='block';
+  var lista=consultaTecnicaLista();
+  if(!lista.length){box.innerHTML='<div class="empty-state"><div class="empty-icon">🧪</div><div>Nenhuma consulta salva ainda.</div></div>';return;}
+  box.innerHTML=lista.slice(0,30).map(function(it){
+    var resumo=(it.json&&it.json.resposta_direta)||'Resposta tecnica salva';
+    return "<div class=\"consulta-hist-item\"><div class=\"consulta-hist-title\">"+escHTML(it.pergunta||'Consulta tecnica')+"</div><div class=\"consulta-hist-meta\">"+escHTML(it.data||'')+" · "+escHTML(it.area||'geral')+(it.uf?' · '+escHTML(it.uf):'')+"</div><div style=\"font-size:11px;color:#8a9bb0;line-height:1.5;margin-top:6px\">"+escHTML(String(resumo).slice(0,180))+"</div><div style=\"display:flex;gap:6px;margin-top:8px;flex-wrap:wrap\"><button class=\"auth-small-btn\" onclick=\"abrirConsultaTecnicaHist('"+escHTML(it.id)+"')\">Abrir</button><button class=\"auth-small-btn\" style=\"background:#3a1010;color:#ffb3b3\" onclick=\"excluirConsultaTecnicaHist('"+escHTML(it.id)+"')\">Excluir</button></div></div>";
+  }).join('');
+}
+
+function abrirConsultaTecnicaHist(id){
+  var it=consultaTecnicaLista().find(function(x){return x.id===id;});
+  if(!it) return;
+  consultaAtualTecnica=it.json||{};
+  var q=document.getElementById('consulta-pergunta'); if(q) q.value=it.pergunta||'';
+  renderConsultaTecnica(consultaAtualTecnica);
+}
+
+function excluirConsultaTecnicaHist(id){
+  var lista=consultaTecnicaLista().filter(function(x){return x.id!==id;});
+  localStorage.setItem(consultaTecnicaKey(), JSON.stringify(lista));
+  renderHistoricoConsultaTecnica(false);
 }
 
 function atualizarDashboardHome(){
