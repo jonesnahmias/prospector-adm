@@ -1391,7 +1391,7 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
           </div>
           <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
             <span id="det-status-badge" class="sbadge">—</span>
-            <button onclick="atualizarObraAtualEspelhada(false)" class="btn-obra btn-abrir" style="font-size:11px;padding:6px 11px;background:linear-gradient(135deg,#0057b7,#00a8e8);color:#fff">🔄 Atualizar Obra</button>
+            <button id="det-atualizar-btn" onclick="atualizarObraAtualEspelhada(false)" class="btn-obra btn-abrir" style="font-size:11px;padding:6px 11px;background:linear-gradient(135deg,#0057b7,#00a8e8);color:#fff">🔄 Atualizar Obra</button>
             <button onclick="editarObraAtual()" class="btn-obra btn-editar" style="font-size:11px;padding:6px 11px">✏️ Editar</button>
           </div>
         </div>
@@ -2024,7 +2024,7 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
     <div id="obra-sub-gastos" class="obra-sub">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         <div>
-          <div style="font-size:13px;font-weight:800;color:#e8f4ff">Controle de Gastos da Obra</div>
+          <div id="gastos-titulo" style="font-size:13px;font-weight:800;color:#e8f4ff">Controle de Gastos da Obra</div>
           <div style="font-size:11px;color:#4a6a8a;margin-top:2px" id="gastos-count">Controle financeiro de despesas reais</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2034,7 +2034,7 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
         </div>
       </div>
 
-      <div class="tbox" style="border-left-color:#00c896;margin-bottom:14px">
+      <div id="gastos-info-box" class="tbox" style="border-left-color:#00c896;margin-bottom:14px">
         <div class="ttitle" style="color:#00c896">💰 Controle de Gastos</div>
         Registre compras, pagamentos, notas fiscais, fornecedores e despesas reais da obra. O módulo compara gastos realizados com o valor base da obra, medições recebidas e saldo financeiro.
       </div>
@@ -6538,6 +6538,7 @@ function resumoFinanceiroSeguro(o){
 }
 function renderFinanceiroResumoCard(o){
   var r=resumoFinanceiroSeguro(o);
+  var centro=!!(o&&o.centroFinanceiro);
   var corSaldo=r.caixa>=0?'#00c896':'#e84545';
   var corPct=r.percentual>=100?'#e84545':(r.percentual>=80?'#f5c842':'#00c896');
   return '<div class="obra-finance-strip">'+
@@ -6545,13 +6546,14 @@ function renderFinanceiroResumoCard(o){
     '<div class="obra-finance-mini"><div class="obra-finance-v">'+fmtMedMoeda(r.pago)+'</div><div class="obra-finance-l">Pago</div></div>'+
     '<div class="obra-finance-mini"><div class="obra-finance-v">'+fmtMedMoeda(r.pendente)+'</div><div class="obra-finance-l">Pendente</div></div>'+
     '<div class="obra-finance-mini"><div class="obra-finance-v" style="color:'+corSaldo+'">'+fmtMedMoeda(r.caixa)+'</div><div class="obra-finance-l">Saldo financeiro</div></div>'+
-    '<div class="obra-finance-mini"><div class="obra-finance-v" style="color:'+corPct+'">'+(r.base?Number(r.percentual||0).toFixed(1).replace('.',',')+'%':'—')+'</div><div class="obra-finance-l">Consumo orçamento</div></div>'+
+    '<div class="obra-finance-mini"><div class="obra-finance-v" style="color:'+corPct+'">'+(r.base?Number(r.percentual||0).toFixed(1).replace('.',',')+'%':'—')+'</div><div class="obra-finance-l">'+(centro?'Consumo base':'Consumo orçamento')+'</div></div>'+
   '</div>';
 }
 function renderFinanceiroDestaqueObra(o){
   var el=document.getElementById('det-financeiro-wrap'); if(!el)return;
   if(!o){el.innerHTML='';return;}
-  el.innerHTML='<div class="obra-finance-header"><div class="obra-finance-header-title">💰 Resumo financeiro da obra</div>'+renderFinanceiroResumoCard(o)+'</div>';
+  var centro=!!o.centroFinanceiro;
+  el.innerHTML='<div class="obra-finance-header"><div class="obra-finance-header-title">💰 '+(centro?'Resumo financeiro do centro de custo':'Resumo financeiro da obra')+'</div>'+renderFinanceiroResumoCard(o)+'</div>';
 }
 function abrirObraModulo(id,sub){
   abrirObra(id);
@@ -6885,6 +6887,7 @@ function abrirObra(id){
   var sm=statusMap[o.status]||{cls:"s-conc",label:o.status};
   var sb=document.getElementById("det-status-badge");
   sb.className="sbadge "+sm.cls; sb.textContent=sm.label;
+  var atualizar=document.getElementById('det-atualizar-btn'); if(atualizar) atualizar.innerHTML='🔄 Atualizar Obra';
   // Meta
   var metas=[];
   if(o.valor)metas.push({l:"Valor Estimado",v:"R$ "+Number(o.valor).toLocaleString("pt-BR")});
@@ -7346,6 +7349,15 @@ function renderCategoriasGastos(o){
 }
 function renderGastosObra(obra){
   var o=obra||gastoObraAtual(); if(!o)return;
+  var centro=!!o.centroFinanceiro;
+  var tit=document.getElementById('gastos-titulo');
+  if(tit) tit.textContent=centro?'Controle de Gastos do Centro de Custo':'Controle de Gastos da Obra';
+  var info=document.getElementById('gastos-info-box');
+  if(info){
+    info.innerHTML=centro
+      ? '<div class="ttitle" style="color:#00c896">💰 Controle administrativo</div>Registre despesas administrativas, escritório, custos globais e pagamentos que não pertencem a uma obra específica. O centro de custo é separado das obras e não carrega módulos técnicos.'
+      : '<div class="ttitle" style="color:#00c896">💰 Controle de Gastos</div>Registre compras, pagamentos, notas fiscais, fornecedores e despesas reais da obra. O módulo compara gastos realizados com o valor base da obra, medições recebidas e saldo financeiro.';
+  }
   var lista=ordenarGastos(getGastosObra(o));
   var filtro=(document.getElementById('gastos-filtro-status')||{}).value||'';
   var busca=((document.getElementById('gastos-busca')||{}).value||'').toLowerCase();
@@ -7363,8 +7375,8 @@ function renderGastosObra(obra){
       '<div class="gasto-kpi"><div class="gasto-kpi-v">'+fmtMedMoeda(res.realizado)+'</div><div class="gasto-kpi-l">Total realizado</div></div>'+ 
       '<div class="gasto-kpi"><div class="gasto-kpi-v">'+fmtMedMoeda(res.pago)+'</div><div class="gasto-kpi-l">Total pago</div></div>'+ 
       '<div class="gasto-kpi"><div class="gasto-kpi-v">'+fmtMedMoeda(res.pendente)+'</div><div class="gasto-kpi-l">Pendente</div></div>'+ 
-      '<div class="gasto-kpi"><div class="gasto-kpi-v">'+res.percentual.toLocaleString('pt-BR',{maximumFractionDigits:2})+'%</div><div class="gasto-kpi-l">Consumo do base</div></div>'+ 
-      '<div class="gasto-kpi"><div class="gasto-kpi-v" style="color:'+(res.caixa>=0?'#00c896':'#e84545')+'">'+fmtMedMoeda(res.caixa)+'</div><div class="gasto-kpi-l">Medições pagas - gastos pagos</div></div>';
+      '<div class="gasto-kpi"><div class="gasto-kpi-v">'+res.percentual.toLocaleString('pt-BR',{maximumFractionDigits:2})+'%</div><div class="gasto-kpi-l">'+(centro?'Consumo da base':'Consumo da base da obra')+'</div></div>'+ 
+      '<div class="gasto-kpi"><div class="gasto-kpi-v" style="color:'+(res.caixa>=0?'#00c896':'#e84545')+'">'+fmtMedMoeda(res.caixa)+'</div><div class="gasto-kpi-l">'+(centro?'Saldo administrativo':'Medições pagas - gastos pagos')+'</div></div>';
   }
   renderCategoriasGastos(o);
   var box=document.getElementById('gastos-lista'); if(!box)return;
@@ -12426,7 +12438,8 @@ function inserirBannerFinanceiro(o){
   var div=document.createElement('div');
   div.id='financeiro-modo-banner';
   div.className='financeiro-modo-banner';
-  div.innerHTML='<div><div class="financeiro-modo-title">💰 Controle de Gastos da Obra</div><div class="financeiro-modo-sub">'+escHTML((o&&o.nome)||'Obra')+' · tela financeira limpa, sem módulos administrativos da obra.</div></div><div class="financeiro-modo-acoes"><button class="financeiro-btn secondary" onclick="voltarPainelFinanceiro()">⬅ Voltar ao Painel Financeiro</button><button class="financeiro-btn primary" onclick="abrirObraCompletaAtual()">📁 Abrir obra completa</button></div>';
+  var centro=!!(o&&o.centroFinanceiro);
+  div.innerHTML='<div><div class="financeiro-modo-title">💰 '+(centro?'Controle de Gastos do Centro de Custo':'Controle de Gastos da Obra')+'</div><div class="financeiro-modo-sub">'+escHTML((o&&o.nome)||(centro?'Centro de custo':'Obra'))+' · '+(centro?'despesas administrativas separadas das obras.':'tela financeira limpa, sem módulos administrativos da obra.')+'</div></div><div class="financeiro-modo-acoes"><button class="financeiro-btn secondary" onclick="voltarPainelFinanceiro()">⬅ Voltar ao Painel Financeiro</button>'+(centro?'':'<button class="financeiro-btn primary" onclick="abrirObraCompletaAtual()">📁 Abrir obra completa</button>')+'</div>';
   det.insertBefore(div, det.firstChild);
 }
 function abrirFinanceiroObra(id){
@@ -12460,6 +12473,8 @@ function voltarPainelFinanceiro(){
 }
 function abrirObraCompletaAtual(){
   var id=obraAtual;
+  var atual=(typeof financeiroObras==='function'?financeiroObras():[]).find(function(x){return String(x.id)===String(id);});
+  if(atual && atual.centroFinanceiro){return abrirFinanceiroObra(id);}
   financeiroModoAtivo=false;
   document.body.classList.remove('financeiro-modo');
   var b=document.getElementById('financeiro-modo-banner'); if(b)b.remove();
@@ -12689,6 +12704,7 @@ function abrirObraCompletaAtual(){
     document.getElementById("det-nome").textContent=centroFinanceiroNome(o);
     document.getElementById("det-subtitulo").textContent=tipoCentroLabel(o)+' · Centro de custo financeiro';
     var sb=document.getElementById("det-status-badge"); if(sb){sb.className='sbadge s-and'; sb.textContent='FINANCEIRO';}
+    var atualizar=document.getElementById('det-atualizar-btn'); if(atualizar) atualizar.innerHTML='🔄 Atualizar Centro';
     document.getElementById("det-meta").innerHTML='<div><div class="oml">Tipo</div><div class="omv">'+escHTML(tipoCentroLabel(o))+'</div></div>';
     renderFinanceiroDestaqueObra(o); renderGastosObra(o); renderHist(o); renderDetResumo(Object.assign({},o,{desc:o.desc||'Centro de custo para lançamentos financeiros.'}));
     document.querySelectorAll(".fase-tab").forEach(function(b){b.classList.remove("on");});
