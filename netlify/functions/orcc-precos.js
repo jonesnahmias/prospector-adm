@@ -58,12 +58,13 @@ function scoreBiblioteca(lib, qNorm) {
 
 function scoreItem(item, termos, qNorm) {
   const txt = norm([item.code, item.description, item.unit, item.category, item.source, item.uf, item.baseDate].join(" "));
+  const words = new Set(txt.split(" ").filter(Boolean));
   let s = 0;
   if (!txt) return 0;
   for (const t of termos) {
     if (!t) continue;
     if (txt === t) s += 80;
-    else if (txt.includes(t)) s += Math.min(35, 8 + t.length);
+    else if (t.includes(" ") ? txt.includes(t) : words.has(t)) s += Math.min(35, 8 + t.length);
   }
   const code = norm(item.code);
   if (code && qNorm.includes(code)) s += 60;
@@ -117,6 +118,7 @@ export default async (req) => {
     const libraryId = url.searchParams.get("libraryId") || "";
     const fonte = norm(url.searchParams.get("fonte") || "");
     const uf = norm(url.searchParams.get("uf") || "");
+    const querInsumo = /preco|preço|custo|valor/.test(qNorm) && !/composicao|composição|servico|serviço|execucao|execução/.test(qNorm);
 
     function escolherBibliotecas(usarUf) {
       let libs = libraries.slice();
@@ -167,6 +169,25 @@ export default async (req) => {
       busca = await buscarEmBibliotecas(libsSemUf);
       libs = libsSemUf;
       ufFallback = true;
+    }
+    if (!libraryId && querInsumo && !busca.results.some(r => r.tipo === "insumo")) {
+      const libsSemUf = escolherBibliotecas(false);
+      const extra = await buscarEmBibliotecas(libsSemUf);
+      const vistos = new Set();
+      const combinados = extra.results.concat(busca.results).filter(r => {
+        const k = [r.tipo, r.codigo, r.biblioteca_id].join("|");
+        if (vistos.has(k)) return false;
+        vistos.add(k);
+        return true;
+      });
+      combinados.sort((a, b) => {
+        const bonusA = a.tipo === "insumo" ? 500 : 0;
+        const bonusB = b.tipo === "insumo" ? 500 : 0;
+        return (b.score + bonusB) - (a.score + bonusA) || b.preco - a.preco;
+      });
+      busca = { results: combinados, erros: Array.from(new Set(extra.erros.concat(busca.erros))) };
+      libs = libsSemUf;
+      ufFallback = !!uf;
     }
 
     const results = busca.results;
