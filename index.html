@@ -7893,16 +7893,28 @@ async function analisarEditalIA(){
     var res = document.getElementById('ai-result');
     if(res) res.scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){
-    try{
-      if(status){status.style.color='#f5c842';status.textContent='IA online nao concluiu. Gerando analise tecnica local do edital...';}
-      var local = gerarAnaliseEditalLocalEngenhariaV2(txt, ctxEl?ctxEl.value:'');
-      importEdital(local);
-      if(status){status.style.color='#00c896';status.textContent='✅ Analise local concluida e salva. Revise anexos e exigencias antes da decisao.';}
-    }catch(e2){
-      if(status){
-        status.style.color='#e84545';
-        status.textContent=(e && e.message) ? e.message : 'Erro ao analisar edital com IA.';
+    if(status){status.style.color='#f5c842';status.textContent='IA online nao concluiu. Gerando analise tecnica local do edital...';}
+    var local = null;
+    try{ local = gerarAnaliseEditalLocalEngenhariaV2(txt, ctxEl?ctxEl.value:''); }
+    catch(eLocal){ local = null; }
+    if(local){
+      try{
+        var destino = document.getElementById('ai-result');
+        if(destino) destino.innerHTML = renderResultadoEdital(local);
+      }catch(eRender){
+        var destino2 = document.getElementById('ai-result');
+        if(destino2){
+          destino2.innerHTML = '<div class="result"><div class="swrap"><div style="flex:1"><div style="font-size:15px;font-weight:800;color:#f5c842;letter-spacing:2px">AVALIAR</div><div style="color:#8a9bb0;font-size:12px;margin-top:4px">Analise local de emergencia gerada porque a IA online falhou. Revise edital, anexos, planilha e habilitacao antes da decisao.</div></div></div><div class="listas"><div class="lbox"><div class="ltitle" style="color:#4a90d9">Resumo tecnico</div><div class="litem">• '+escHTML(local.objeto||'Objeto a confirmar no edital completo.')+'</div><div class="litem">• Valor: '+escHTML(local.valor_estimado||'nao identificado')+'</div><div class="litem">• Modalidade: '+escHTML(local.modalidade||'a confirmar')+'</div></div></div></div>';
+        }
       }
+      try{ salvarHistoricoEdital(local); }catch(eHist){}
+      try{ registrarAtividade('Análise de edital local salva após falha da IA online'); }catch(eAtiv){}
+      if(status){status.style.color='#00c896';status.textContent='✅ Analise local concluida. A IA online falhou, mas o app gerou uma base tecnica para revisao.';}
+      var resLocal = document.getElementById('ai-result');
+      if(resLocal) resLocal.scrollIntoView({behavior:'smooth',block:'start'});
+    }else if(status){
+      status.style.color='#e84545';
+      status.textContent='Nao foi possivel gerar a analise deste edital nesta tentativa.';
     }
   }finally{
     if(btn){btn.disabled=false;btn.textContent='🚀 Analisar IA';}
