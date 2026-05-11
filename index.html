@@ -9043,7 +9043,7 @@ function renderHistoricoProjObra(toggle){
   var box = document.getElementById('proj-hist-box');
   if(!box) return;
   if(toggle && box.style.display === 'block'){ box.style.display='none'; return; }
-  box.style.display='block';
+  box.style.display=(toggle || box.style.display === 'block') ? 'block' : 'none';
   var o = getObras().find(function(x){return x.id===obraAtual;});
   var lista = listaHistoricoProjObra();
   if(o && o.analise_proj && !lista.length){
@@ -9230,7 +9230,7 @@ function renderHistoricoPerfis(toggle){
   var box = document.getElementById('perfil-hist-box');
   if(!box)return;
   if(toggle && box.style.display === 'block'){ box.style.display = 'none'; return; }
-  box.style.display = 'block';
+  box.style.display = (toggle || box.style.display === 'block') ? 'block' : 'none';
   var lista = normalizarHistoricoGlobal(historicoGlobalCache).perfis || [];
   if(!lista.length){
     box.innerHTML = '<div class="tbox" style="border-left-color:#f5c842"><div class="ttitle" style="color:#f5c842">📚 Histórico do Perfil</div><div style="font-size:12px;color:#8a9bb0;margin-top:6px">Nenhum perfil salvo no histórico ainda. Clique em 💾 Salvar Perfil para gravar uma versão.</div></div>';
@@ -9303,7 +9303,7 @@ function renderHistoricoEditais(toggle){
   var box = document.getElementById('edital-hist-box');
   if(!box)return;
   if(toggle && box.style.display === 'block'){ box.style.display = 'none'; return; }
-  box.style.display = 'block';
+  box.style.display = (toggle || box.style.display === 'block') ? 'block' : 'none';
   var lista = normalizarHistoricoGlobal(historicoGlobalCache).editais || [];
   if(!lista.length){
     box.innerHTML = '<div class="tbox" style="border-left-color:#f5c842"><div class="ttitle" style="color:#f5c842">📚 Histórico de Editais</div><div style="font-size:12px;color:#8a9bb0;margin-top:6px">Nenhuma análise salva ainda. Cada importação de análise de edital será gravada automaticamente aqui.</div></div>';
@@ -9390,7 +9390,7 @@ function renderHistoricoOrcObra(toggle){
   var box = document.getElementById('orc-obra-hist-box');
   if(!box)return;
   if(toggle && box.style.display === 'block'){ box.style.display = 'none'; return; }
-  box.style.display = 'block';
+  box.style.display = (toggle || box.style.display === 'block') ? 'block' : 'none';
   var o = getObras().find(function(x){return x.id===obraAtual;});
   var lista = o && Array.isArray(o.historico_ia) ? o.historico_ia.filter(function(i){return i.tipo==='orcamento';}) : [];
   if(!lista.length){
@@ -9754,7 +9754,7 @@ function renderHistoricoOrcGeral(toggle){
   var box = document.getElementById('orc-hist-box');
   if(!box) return;
   if(toggle && box.style.display === 'block'){ box.style.display='none'; return; }
-  box.style.display = 'block';
+  box.style.display = (toggle || box.style.display === 'block') ? 'block' : 'none';
   historicoGlobalCache = normalizarHistoricoGlobal(historicoGlobalCache);
   var lista = historicoGlobalCache.orcamentos || [];
   if(!lista.length){
@@ -9820,7 +9820,7 @@ renderHistoricoOrcObra = function(toggle){
   var o = getObras().find(function(x){return x.id===obraAtual;});
   if(o && o.analise_orc && (!Array.isArray(o.historico_ia) || !o.historico_ia.some(function(i){return i.tipo==='orcamento';}))){
     if(toggle && box.style.display === 'block'){ box.style.display = 'none'; return; }
-    box.style.display = 'block';
+    box.style.display = (toggle || box.style.display === 'block') ? 'block' : 'none';
     var j = normalizarAnaliseOrcamento(o.analise_orc);
     box.innerHTML = '<div class="tbox" style="border-left-color:#f5c842"><div class="ttitle" style="color:#f5c842">📚 Histórico de Orçamentos da Obra</div><div style="font-size:12px;color:#8a9bb0;margin-top:6px;margin-bottom:8px">Existe uma análise atual salva na obra, mas ela veio de uma versão anterior do app e ainda não estava listada no histórico.</div><button onclick="abrirHistOrcObra(\'analise_atual\')" style="background:#0057b7;color:#fff;border:0;border-radius:7px;padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer">Abrir análise atual</button></div>';
     return;
@@ -9896,7 +9896,7 @@ function renderHistoricoFornObra(toggle){
   var box = document.getElementById('forn-hist-box');
   if(!box) return;
   if(toggle && box.style.display === 'block'){ box.style.display = 'none'; return; }
-  box.style.display = 'block';
+  box.style.display = (toggle || box.style.display === 'block') ? 'block' : 'none';
   var o = getObras().find(function(x){return x.id===obraAtual;});
   var lista = o && Array.isArray(o.historico_ia) ? o.historico_ia.filter(function(i){return i.tipo==='fornecedores';}) : [];
 
@@ -10088,7 +10088,7 @@ function renderHistoricoModuloObra(tipo, toggle){
   var box = document.getElementById(cfg.box);
   if(!box) return;
   if(toggle && box.style.display === 'block'){ box.style.display='none'; return; }
-  box.style.display='block';
+  box.style.display=(toggle || box.style.display === 'block') ? 'block' : 'none';
   var lista = listaHistoricoModulo(tipo);
   if(!lista.length){
     box.innerHTML = '<div class="tbox" style="border-left-color:#f5c842"><div class="ttitle" style="color:#f5c842">📚 Histórico de '+escHTML(cfg.label)+'</div><div style="font-size:12px;color:#8a9bb0;margin-top:6px">Nenhum registro salvo neste módulo ainda. Cada importação da IA será gravada automaticamente aqui.</div></div>';
