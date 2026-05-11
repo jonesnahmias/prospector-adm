@@ -7781,6 +7781,86 @@ function copiarEditalParaIA(){
   copiarTextoClipboard(prompt,'div#pdf-status','Prompt copiado! Cole no Claude e importe o resultado com 📥 Importar.');
 }
 
+function editalMatchTexto(txt, re, fallback){
+  var m = String(txt||'').match(re);
+  return m && m[1] ? m[1].replace(/\s+/g,' ').trim() : (fallback||'');
+}
+
+function editalExtrairValor(txt){
+  var m = String(txt||'').match(/(?:valor\s+(?:total\s+)?(?:da\s+contrata[cç][aã]o|estimado|global)|or[cç]amento|pre[cç]o\s+global)[^\n\r]{0,80}?R\$\s*([\d\.\,]+)/i);
+  if(!m) m = String(txt||'').match(/R\$\s*([\d\.\,]+)/i);
+  return m ? ('R$ '+m[1]) : '';
+}
+
+function gerarAnaliseEditalLocalEngenhariaV2(txt, contexto){
+  txt = String(txt||'');
+  var all = (txt+'\n'+String(contexto||''));
+  var pav = /cb[uú]q|asfalto|asf[aá]lt|cap\b|pavimenta|recape|capeamento|fresagem|vi[aá]ria|rodovia|ponte|acesso/i.test(all);
+  var bombeiro = /bombeiro|canil|alojamento|quartel|militar/i.test(all);
+  var objeto = editalMatchTexto(all, /(?:objeto|contrata[cç][aã]o\s+de|obras?\s+e\s+servi[cç]os?\s+de)\s*[:\-]?\s*([^\n\r]{40,500})/i, '');
+  if(!objeto) objeto = all.split(/\n+/).map(function(l){return l.trim();}).filter(function(l){return /obra|servi[cç]o|engenharia|constru[cç][aã]o|reforma|pavimenta/i.test(l);})[0] || 'Objeto a confirmar no edital completo.';
+  var modalidade = editalMatchTexto(all, /(concorr[eê]ncia\s+eletr[oô]nica|preg[aã]o\s+eletr[oô]nico|tomada\s+de\s+pre[cç]os|dispensa|concorr[eê]ncia)/i, '');
+  var julgamento = editalMatchTexto(all, /(menor\s+pre[cç]o|maior\s+desconto|t[eé]cnica\s+e\s+pre[cç]o|empreitada\s+por\s+pre[cç]o\s+global|empreitada\s+por\s+pre[cç]o\s+unit[aá]rio)/i, '');
+  var prazo = editalMatchTexto(all, /(?:prazo\s+(?:de\s+)?(?:execu[cç][aã]o|contratual)|execu[cç][aã]o)[^\n\r]{0,80}?(\d+\s*(?:dias|meses|m[eê]s))/i, '');
+  var abertura = editalMatchTexto(all, /(?:data\s+da\s+abertura|abertura|recebimento\s+das\s+propostas)[^\n\r]{0,120}?(\d{1,2}\/\d{1,2}\/\d{2,4}(?:\s*(?:as|às)?\s*\d{1,2}[:h]\d{0,2})?)/i, '');
+  var valor = editalExtrairValor(all);
+  var tipoObra = pav ? 'Obra viaria / pavimentacao / asfalto' : (bombeiro ? 'Obra civil institucional / edificacao publica' : 'Obra ou servico de engenharia');
+  var servicos = pav ? [
+    'Mobilizacao, sinalizacao e seguranca da obra',
+    'Topografia, locacao e controle geometrico',
+    'Regularizacao/preparo de subleito e camadas de base quando aplicavel',
+    'Imprimacao, pintura de ligacao, fornecimento/transporte/aplicacao de CBUQ/CAP se previsto',
+    'Compactacao, acabamento, ensaios e controle tecnologico'
+  ] : [
+    'Mobilizacao e instalacao de canteiro',
+    'Levantamento/vistoria inicial e compatibilizacao com projeto/memorial',
+    'Execucao dos servicos civis previstos no objeto',
+    'Controle de qualidade, diario de obra, medicao e entrega final'
+  ];
+  var equipamentos = pav ? [
+    'Vibroacabadora de asfalto',
+    'Rolo tandem liso',
+    'Rolo pneumatico',
+    'Caminhoes basculantes',
+    'Caminhao espargidor',
+    'Motoniveladora/pa carregadeira conforme camada prevista',
+    'Equipe de topografia e laboratorio de controle tecnologico'
+  ] : [
+    'Ferramentas e equipamentos compativeis com obra civil',
+    'Andaimes/escoramentos/protecoes quando houver trabalho em altura',
+    'Equipamentos de transporte interno e carga/descarga',
+    'Instrumentos de medicao, testes e controle de qualidade'
+  ];
+  return {
+    objeto: objeto,
+    tipo_obra: tipoObra,
+    valor_estimado: valor || 'Nao identificado no texto extraido',
+    prazo_execucao: prazo || 'Nao identificado no texto extraido',
+    prazo_proposta: abertura || 'Verificar data/hora de abertura e envio da proposta no edital',
+    modalidade: [modalidade, julgamento].filter(Boolean).join(' - ') || 'Modalidade/criterio a confirmar',
+    servicos_criticos: servicos,
+    equipamentos_criticos: equipamentos,
+    insumos_criticos: pav ? ['CBUQ/CAP','Material de base/sub-base','Emulsao asfaltica','Agregados','Combustivel/logistica de transporte'] : ['Materiais principais do memorial','EPIs/EPCs','Materiais de acabamento/instalacoes a confirmar','Insumos de ensaio e controle'],
+    controles_qualidade: pav ? ['Granulometria e compactacao de base/sub-base','Temperatura e espessura do CBUQ','Grau de compactacao','Acabamento superficial e liberacao por ensaios'] : ['Conferencia de projeto e memorial','Recebimento de materiais','Checklist por etapa','Registros fotograficos e diario de obra'],
+    lacunas_tecnicas: ['Conferir anexos, planilha, memorial, projetos, exigencias de visita tecnica e criterios de medicao.','Validar se o texto extraido do PDF trouxe todas as paginas e anexos.'],
+    requisitos_tecnicos: ['Verificar atestados CAT/CREA compativeis com o objeto.','Confirmar exigencias de capacidade tecnico-operacional e profissional.','Checar visita tecnica, garantia, seguros, prazos de recurso e habilitacao.'],
+    pontos_atencao: ['Analise local gerada porque a IA online nao concluiu a chamada nesta tentativa.','Antes de decidir, validar a planilha orcamentaria, anexos e edital completo.', pav ? 'Para pavimentacao/asfalto, conferir usina, transporte, equipamentos de aplicacao/compactacao e controle tecnologico.' : 'Conferir interferencias, acesso, canteiro, projetos e memorial executivo.'],
+    qualificacao: {
+      score: 55,
+      hab_juridica: {status:'ATENCAO', obs:'Confirmar documentos societarios e declaracoes exigidas.'},
+      qual_economica: {status:'ATENCAO', obs:'Conferir indices, balanco, capital/patrimonio minimo e garantias.'},
+      qual_tecnica: {status:'ATENCAO', obs:'Validar CAT/atestados compativeis com objeto, parcelas relevantes e responsavel tecnico.'},
+      reg_fiscal: {status:'ATENCAO', obs:'Confirmar regularidade fiscal, trabalhista, FGTS e cadastros locais.'},
+      cap_operacional: {status:'ATENCAO', obs:'Confirmar equipe, equipamentos, fornecedores e logistica para o prazo.'},
+      pendencias: ['Revisar edital completo e anexos.','Validar planilha orcamentaria e exigencias de habilitacao.','Comparar objeto com acervo tecnico da empresa.'],
+      diferenciais: ['Cruzar perfil da empresa com acervo, faturamento, localizacao e capacidade operacional cadastrados.']
+    },
+    recomendacao: 'AVALIAR',
+    justificativa: 'A analise local identificou objeto, riscos e exigencias principais, mas a decisao depende de validar anexos, planilha e qualificacao tecnica/economica no edital completo.',
+    _motor_v2: {versao:'engenharia-v2-local-edital', provider:'local', motivo:'api_indisponivel_ou_timeout'}
+  };
+}
+
 async function analisarEditalIA(){
   var txtEl = document.getElementById('txt-edital');
   var txt = txtEl ? txtEl.value.trim() : '';
@@ -7797,15 +7877,32 @@ async function analisarEditalIA(){
       body:JSON.stringify({edital:txt,contexto:ctxEl?ctxEl.value:''})
     });
     var j = await r.json().catch(function(){return {};});
-    if(!r.ok || j.error) throw new Error(j.error || 'Falha ao analisar edital.');
+    if(!r.ok || j.error){
+      if(status){status.style.color='#f5c842';status.textContent='A tentativa completa falhou. Refazendo edital em modo tecnico enxuto...';}
+      var r2 = await fetch('/api/analisar-edital',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({edital:txt.slice(0,14000),contexto:(ctxEl?ctxEl.value:'')+'\nModo enxuto: priorizar dados decisorios, qualificacao e riscos.',enxuto:true})
+      });
+      var j2 = await r2.json().catch(function(){return {};});
+      if(!r2.ok || j2.error) throw new Error(j2.error || j.error || 'Falha ao analisar edital.');
+      j = j2;
+    }
     importEdital(j.analise || j);
     if(status){status.style.color='#00c896';status.textContent='✅ Análise IA concluída e salva no histórico.';}
     var res = document.getElementById('ai-result');
     if(res) res.scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){
-    if(status){
-      status.style.color='#e84545';
-      status.textContent=(e && e.message) ? e.message : 'Erro ao analisar edital com IA.';
+    try{
+      if(status){status.style.color='#f5c842';status.textContent='IA online nao concluiu. Gerando analise tecnica local do edital...';}
+      var local = gerarAnaliseEditalLocalEngenhariaV2(txt, ctxEl?ctxEl.value:'');
+      importEdital(local);
+      if(status){status.style.color='#00c896';status.textContent='✅ Analise local concluida e salva. Revise anexos e exigencias antes da decisao.';}
+    }catch(e2){
+      if(status){
+        status.style.color='#e84545';
+        status.textContent=(e && e.message) ? e.message : 'Erro ao analisar edital com IA.';
+      }
     }
   }finally{
     if(btn){btn.disabled=false;btn.textContent='🚀 Analisar IA';}
@@ -8647,6 +8744,17 @@ function renderResultadoEdital(j){
   var req = asList(firstVal(j.requisitos_tecnicos, j.requisitos_técnicos, j.requisitos, j.exigencias_tecnicas, []));
   var atn = asList(firstVal(j.pontos_atencao, j.pontos_atenção, j.pontos_de_atencao, j.pontos_de_atenção, j.alertas, j.riscos, []));
   html+='<div class="listas"><div class="lbox"><div class="ltitle" style="color:#4a90d9">Requisitos Técnicos</div>'+editalListaHtml(req)+'</div><div class="lbox"><div class="ltitle" style="color:#f5c842">Pontos de Atenção</div>'+editalListaHtml(atn)+'</div></div>';
+  var serv = asList(firstVal(j.servicos_criticos, j.serviços_criticos, j.servicos, []));
+  var eq = asList(firstVal(j.equipamentos_criticos, j.equipamentos, []));
+  var ins = asList(firstVal(j.insumos_criticos, j.insumos, []));
+  var cq = asList(firstVal(j.controles_qualidade, j.controle_qualidade, []));
+  var lac = asList(firstVal(j.lacunas_tecnicas, j.lacunas, j.pendencias_tecnicas, []));
+  if(serv.length || eq.length){
+    html+='<div class="listas"><div class="lbox"><div class="ltitle" style="color:#00c896">Servicos criticos</div>'+editalListaHtml(serv)+'</div><div class="lbox"><div class="ltitle" style="color:#c084fc">Equipamentos criticos</div>'+editalListaHtml(eq)+'</div></div>';
+  }
+  if(ins.length || cq.length || lac.length){
+    html+='<div class="listas"><div class="lbox"><div class="ltitle" style="color:#8ab4ff">Insumos criticos</div>'+editalListaHtml(ins)+'</div><div class="lbox"><div class="ltitle" style="color:#00c896">Controle de qualidade</div>'+editalListaHtml(cq)+'</div><div class="lbox"><div class="ltitle" style="color:#f5c842">Lacunas tecnicas</div>'+editalListaHtml(lac)+'</div></div>';
+  }
   html+='</div>';
   return html;
 }
