@@ -2562,8 +2562,8 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
           <div class="fg">
             <label class="fl">Fonte de custo</label>
             <select class="fi" id="consulta-fonte">
-              <option value="referencial">Referencial tecnico, sem inventar preco</option>
-              <option value="sinapi">Priorizar SINAPI/SICRO/ORCC</option>
+              <option value="sinapi">Priorizar ORCC/SINAPI/SICRO</option>
+              <option value="referencial">Referencial tecnico sem base de preco</option>
               <option value="cotacao">Orientar cotacao de mercado</option>
               <option value="memorial">Gerar texto para memorial/orcamento</option>
             </select>
@@ -7735,14 +7735,14 @@ async function buscarPrecosOrccConsulta(d){
   if(q.length<2) return {results:[]};
   var st=document.getElementById('consulta-orcc-status');
   if(st){st.style.color='#4a90d9';st.textContent='Consultando preços no ORCC...';}
-  var params=new URLSearchParams({q:q,limit:'12'});
+  var params=new URLSearchParams({q:q,limit:'20'});
   if(d&&d.uf) params.set('uf',d.uf);
   var r=await fetch('/api/orcc-precos?'+params.toString());
   var data=await r.json().catch(function(){return {};});
   if(!r.ok || data.error) throw new Error(data.error||'Falha na consulta ORCC.');
   if(st){
     st.style.color=(data.results&&data.results.length)?'#00c896':'#f5c842';
-    st.textContent=(data.results&&data.results.length)?('ORCC: '+data.results.length+' preço(s) encontrado(s)'+(data.uf_fallback?' em base de referência fora da UF informada.':'.')):'ORCC: nenhum preço encontrado para esta busca.';
+    st.textContent=(data.results&&data.results.length)?('ORCC/SINAPI/SICRO: '+data.results.length+' referência(s) encontrada(s)'+(data.uf_fallback?' em base fora da UF informada.':'.')):'ORCC/SINAPI/SICRO: nenhuma referência encontrada para esta busca.';
   }
   return data;
 }
@@ -7755,7 +7755,8 @@ function promptConsultaTecnica(){
     'Responda de forma pratica para obra real, sem generalidades.',
     'Quando existir parametro usual de engenharia reconhecido, responda com valor numerico de referencia e faixa usual. Exemplo: imprimação com CM-30 sobre base granular/solo estabilizado costuma adotar taxa de referencia de 1,5 L/m2, com ajuste por textura/absorção, normalmente em faixa aproximada de 0,8 a 1,6 L/m2 conforme especificacao, teste de campo e norma/órgão contratante.',
     'Para pavimentacao, informe taxas usuais quando a pergunta pedir consumo/aplicacao: imprimação CM-30, pintura de ligacao RR-1C/RR-2C, CBUQ por espessura/densidade, compactacao, ensaios e liberacao.',
-    'Se envolver preco/custo, NAO invente valor exato. Informe que deve ser validado por SINAPI/SICRO/ORCC/cotacao e descreva como orcar.',
+    'Se envolver preco/custo e houver bloco PREÇOS ORCC/SINAPI/SICRO SINCRONIZADOS, use esses valores exatos como referencia da base indicada, citando fonte, UF, mes-base, codigo, unidade e observando BDI, perdas, frete e cotacao local quando aplicavel.',
+    'Se envolver preco/custo e NAO houver preco sincronizado, nao invente valor exato; explique quais bases SINAPI/SICRO/ORCC/cotacoes devem ser consultadas e como orcar.',
     'Se envolver produto/material, informe aplicacao, quando usar, quando nao usar, preparo de superficie/base, execucao, controle de qualidade, riscos e alternativas.',
     'Se envolver especificacao, gere texto tecnico pronto para memorial/orcamento.',
     'Retorne SOMENTE JSON valido sem markdown neste formato:',
@@ -7853,9 +7854,43 @@ function renderPrecosOrccConsulta(j){
   var rows = lista.slice(0,10).map(function(x){
     var preco = consultaNum(x.preco);
     var custoTaxa = taxa && /^(l|litro|litros)$/i.test(String(x.unidade||'')) ? preco*taxa : 0;
-    return '<tr><td>'+escHTML(x.codigo||'')+'</td><td>'+escHTML(x.descricao||'')+'</td><td>'+escHTML(x.unidade||'')+'</td><td>'+escHTML(x.preco_fmt||consultaBrl(preco))+'</td><td>'+escHTML([x.fonte,x.uf,x.mes].filter(Boolean).join(' / '))+'</td><td>'+escHTML(custoTaxa?consultaBrl(custoTaxa):'--')+'</td></tr>';
+    return '<tr><td>'+escHTML(x.tipo||'')+'</td><td>'+escHTML(x.codigo||'')+'</td><td>'+escHTML(x.descricao||'')+'</td><td>'+escHTML(x.unidade||'')+'</td><td>'+escHTML(x.preco_fmt||consultaBrl(preco))+'</td><td>'+escHTML([x.fonte,x.uf,x.mes].filter(Boolean).join(' / '))+'</td><td>'+escHTML(custoTaxa?consultaBrl(custoTaxa):'--')+'</td></tr>';
   }).join('');
-  return '<div class="tbox" style="margin-top:10px;border-left-color:#00c896"><div class="ttitle" style="color:#00c896">Preços sincronizados do ORCC</div><div style="font-size:12px;color:#8a9bb0;margin-bottom:8px">Fonte: ORCC direto. '+(taxa?'Cálculo com taxa de aplicação: '+escHTML(String(taxa).replace('.',','))+' L/m².':'')+'</div><div style="overflow-x:auto"><table class="orc-table"><thead><tr><th>Código</th><th>Descrição</th><th>Un.</th><th>Preço unit.</th><th>Fonte</th><th>Custo por m²</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  return '<div class="tbox" style="margin-top:10px;border-left-color:#00c896"><div class="ttitle" style="color:#00c896">Preços ORCC / SINAPI / SICRO sincronizados</div><div style="font-size:12px;color:#8a9bb0;margin-bottom:8px">Fonte: ORCC direto. '+((j.precos_orcc&&j.precos_orcc.uf_fallback)?'Sem referência direta na UF informada; exibindo base alternativa. ':'')+(taxa?'Cálculo com taxa de aplicação: '+escHTML(String(taxa).replace('.',','))+' L/m².':'')+'</div><div style="overflow-x:auto"><table class="orc-table"><thead><tr><th>Tipo</th><th>Código</th><th>Descrição</th><th>Un.</th><th>Preço unit.</th><th>Fonte</th><th>Custo por m²</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+
+function resumoPrecosOrccConsulta(precos){
+  var lista = (precos&&Array.isArray(precos.results)) ? precos.results : [];
+  if(!lista.length) return '';
+  return lista.slice(0,8).map(function(x){
+    return [x.tipo,x.codigo,x.descricao,x.unidade,x.preco_fmt||consultaBrl(x.preco),x.fonte,x.uf,x.mes].filter(Boolean).join(' | ');
+  }).join('\n');
+}
+
+function aplicarPrecosOrccConsulta(j, precos, d){
+  j = j || {};
+  var lista = (precos&&Array.isArray(precos.results)) ? precos.results : [];
+  if(!lista.length) return j;
+  var top = lista.find(function(x){return x.tipo==='insumo';}) || lista[0];
+  var ref = (top.preco_fmt||consultaBrl(top.preco)) + (top.unidade ? ' / '+top.unidade : '') + ' - '+[top.fonte,top.uf,top.mes].filter(Boolean).join(' / ') + (top.codigo ? ' - cód. '+top.codigo : '');
+  var resposta = String(j.resposta_direta || j.resposta || '').trim();
+  if(!resposta || /n[aã]o informar pre[cç]o|sem cota[cç][aã]o|validado por sinapi|validado por orcc|validado por sicro/i.test(resposta)){
+    j.resposta_direta = 'Referência encontrada no ORCC: '+(top.descricao||'item consultado')+' = '+ref+'. Use como custo unitário da base indicada; para orçamento final, aplicar BDI, perdas, frete, impostos, produtividade e cotações locais quando necessário.';
+  }
+  if(!j.valor_referencia || /validar|cot/i.test(String(j.valor_referencia))){
+    j.valor_referencia = ref;
+  }
+  if(!j.faixa_usual && lista.length>1){
+    var mesmos = lista.slice(0,5).map(function(x){return x.preco_fmt||consultaBrl(x.preco);}).filter(Boolean);
+    if(mesmos.length>1) j.faixa_usual = 'Referências comparáveis: '+mesmos.join(' | ');
+  }
+  j.custo_referencia = j.custo_referencia || {};
+  if(typeof j.custo_referencia !== 'object') j.custo_referencia = {orientacao:String(j.custo_referencia||'')};
+  j.custo_referencia.orientacao = 'Usar a tabela sincronizada do ORCC abaixo como referência direta. Priorizar itens da mesma UF e mesma fonte-base; quando a resposta for composição, verificar se o usuário precisa do custo unitário do insumo ou do serviço composto.';
+  j.custo_referencia.bases = Array.from(new Set(lista.map(function(x){return [x.fonte,x.uf,x.mes].filter(Boolean).join(' / ');}).filter(Boolean)));
+  j.custo_referencia.composicoes_sugeridas = lista.slice(0,6).map(function(x){return (x.codigo?x.codigo+' - ':'')+(x.descricao||'');});
+  j.precos_orcc = precos;
+  return j;
 }
 
 var consultaAtualTecnica = null;
@@ -7875,19 +7910,17 @@ async function consultarTecnicaIA(){
   try{
     var promptTec = promptConsultaTecnica();
     if(precosOrcc && Array.isArray(precosOrcc.results) && precosOrcc.results.length){
-      promptTec += '\n\nPREÇOS ORCC SINCRONIZADOS (usar como fonte de preço, sem inventar valores):\n'+JSON.stringify(precosOrcc.results.slice(0,8));
+      promptTec += '\n\nPREÇOS ORCC/SINAPI/SICRO SINCRONIZADOS (usar estes valores como fonte de preço; nao substituir por estimativa de IA):\n'+resumoPrecosOrccConsulta(precosOrcc)+'\n\nJSON dos preços:\n'+JSON.stringify(precosOrcc.results.slice(0,10));
     }
     var r = await fetch('/api/ia-json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo:'consulta-tecnica',prompt:promptTec,max_output_tokens:2800,timeout_ms:30000})});
     var data = await r.json().catch(function(){return {};});
     if(!r.ok || data.error) throw new Error(data.error || 'Falha na consulta tecnica.');
-    consultaAtualTecnica = data.json || data;
-    consultaAtualTecnica.precos_orcc = precosOrcc || {results:[]};
+    consultaAtualTecnica = aplicarPrecosOrccConsulta(data.json || data, precosOrcc || {results:[]}, d);
     renderConsultaTecnica(consultaAtualTecnica);
     salvarConsultaTecnica({id:genId(),data:dataHist(),pergunta:d.pergunta,tipo:d.tipo,area:d.area,uf:d.uf,json:consultaAtualTecnica});
     if(st){st.style.color='#00c896';st.textContent='Consulta concluida e salva na biblioteca.';}
   }catch(e){
-    consultaAtualTecnica = gerarConsultaTecnicaLocal(d);
-    consultaAtualTecnica.precos_orcc = precosOrcc || {results:[]};
+    consultaAtualTecnica = aplicarPrecosOrccConsulta(gerarConsultaTecnicaLocal(d), precosOrcc || {results:[]}, d);
     renderConsultaTecnica(consultaAtualTecnica);
     salvarConsultaTecnica({id:genId(),data:dataHist(),pergunta:d.pergunta,tipo:d.tipo,area:d.area,uf:d.uf,json:consultaAtualTecnica});
     if(st){st.style.color='#f5c842';st.textContent='IA online nao concluiu. Gere uma resposta tecnica local para revisao.';}
