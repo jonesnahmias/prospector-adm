@@ -7742,7 +7742,7 @@ async function buscarPrecosOrccConsulta(d){
   if(!r.ok || data.error) throw new Error(data.error||'Falha na consulta ORCC.');
   if(st){
     st.style.color=(data.results&&data.results.length)?'#00c896':'#f5c842';
-    st.textContent=(data.results&&data.results.length)?('ORCC: '+data.results.length+' preço(s) encontrado(s).'):'ORCC: nenhum preço encontrado para esta busca.';
+    st.textContent=(data.results&&data.results.length)?('ORCC: '+data.results.length+' preço(s) encontrado(s)'+(data.uf_fallback?' em base de referência fora da UF informada.':'.')):'ORCC: nenhum preço encontrado para esta busca.';
   }
   return data;
 }

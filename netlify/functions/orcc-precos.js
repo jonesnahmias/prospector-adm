@@ -31,9 +31,11 @@ async function orccJson(path) {
 }
 
 function termosBusca(q) {
-  const base = norm(q).split(" ").filter(t => t.length >= 2);
+  const stop = new Set(["qual", "quais", "preco", "precos", "custo", "custos", "valor", "valores", "referencia", "referencial", "obra", "material", "item", "insumo", "sobre", "para", "com", "por", "dos", "das", "uma", "uns"]);
+  const base = norm(q).split(" ").filter(t => t.length >= 2 && !stop.has(t));
   const extras = [];
   const nq = norm(q);
+  if (/cimento|portland|cp\s*[ivx0-9]/.test(nq)) extras.push("cimento portland", "cimento", "portland", "cp ii", "cp iv", "cp v");
   if (/cm\s*30|imprima/.test(nq)) extras.push("cm30", "cm 30", "asfalto diluido", "imprimacao", "imprimacao");
   if (/rr\s*1c|rr\s*2c|pintura\s+de\s+liga|ligacao/.test(nq)) extras.push("rr 1c", "rr 2c", "emulsao", "pintura ligacao");
   if (/cbuq|asfalto|cap/.test(nq)) extras.push("asfalto", "cbuq", "cap");
@@ -68,7 +70,7 @@ function scoreItem(item, termos, qNorm) {
   if (/cm\s*30|imprima/.test(qNorm) && /cm\s*30|cm30|asfalto diluido|imprima/.test(txt)) s += 80;
   if (/rr\s*1c|rr\s*2c|pintura\s+de\s+liga|ligacao/.test(qNorm) && /rr\s*1c|rr\s*2c|emulsao|pintura.*liga/.test(txt)) s += 70;
   if (/cbuq/.test(qNorm) && /cbuq|concreto betuminoso|asfalto/.test(txt)) s += 50;
-  if (/preco|preço|custo|valor/.test(qNorm)) s += 3;
+  if (/cimento|portland/.test(qNorm) && /cimento\s+portland/.test(txt)) s += 90;
   return s;
 }
 
@@ -116,43 +118,67 @@ export default async (req) => {
     const fonte = norm(url.searchParams.get("fonte") || "");
     const uf = norm(url.searchParams.get("uf") || "");
 
-    let libs = libraries.slice();
-    if (libraryId) libs = libs.filter(l => String(l.id) === libraryId);
-    if (fonte) libs = libs.filter(l => norm(l.source).includes(fonte) || norm(l.name).includes(fonte));
-    if (uf) libs = libs.filter(l => norm(l.uf).includes(uf));
-    libs = libs
-      .map(l => ({ ...l, _score: scoreBiblioteca(l, qNorm) }))
-      .sort((a, b) => b._score - a._score)
-      .slice(0, libraryId ? 1 : 8);
-
-    const results = [];
-    const erros = [];
-    for (const lib of libs) {
-      try {
-        const data = await orccJson("/.netlify/functions/bases-store?action=load&id=" + encodeURIComponent(lib.id));
-        const base = data.base || {};
-        const supplies = Array.isArray(base.supplies) ? base.supplies : [];
-        const comps = Array.isArray(base.compositions) ? base.compositions : [];
-        for (const s of supplies) {
-          const sc = scoreItem(s, termos, qNorm);
-          if (sc > 0) results.push({ ...mapItem(s, "insumo", lib), score: sc });
-        }
-        for (const c of comps) {
-          const sc = scoreItem(c, termos, qNorm);
-          if (sc > 0) results.push({ ...mapItem(c, "composicao", lib), score: sc });
-        }
-      } catch (e) {
-        erros.push(`${lib.name || lib.id}: ${e.message || e}`);
-      }
+    function escolherBibliotecas(usarUf) {
+      let libs = libraries.slice();
+      if (libraryId) libs = libs.filter(l => String(l.id) === libraryId);
+      if (fonte) libs = libs.filter(l => norm(l.source).includes(fonte) || norm(l.name).includes(fonte));
+      if (usarUf && uf) libs = libs.filter(l => norm(l.uf).includes(uf));
+      return libs
+        .map(l => ({ ...l, _score: scoreBiblioteca(l, qNorm) + ((uf && norm(l.uf).includes(uf)) ? 20 : 0) }))
+        .sort((a, b) => b._score - a._score)
+        .slice(0, libraryId ? 1 : 8);
     }
 
-    results.sort((a, b) => b.score - a.score || b.preco - a.preco);
+    async function buscarEmBibliotecas(libs) {
+      const results = [];
+      const erros = [];
+      for (const lib of libs) {
+        try {
+          const data = await orccJson("/.netlify/functions/bases-store?action=load&id=" + encodeURIComponent(lib.id));
+          const base = data.base || {};
+          const supplies = Array.isArray(base.supplies) ? base.supplies : [];
+          const comps = Array.isArray(base.compositions) ? base.compositions : [];
+          for (const s of supplies) {
+            const sc = scoreItem(s, termos, qNorm);
+            if (sc > 0) results.push({ ...mapItem(s, "insumo", lib), score: sc });
+          }
+          for (const c of comps) {
+            const sc = scoreItem(c, termos, qNorm);
+            if (sc > 0) results.push({ ...mapItem(c, "composicao", lib), score: sc });
+          }
+        } catch (e) {
+          erros.push(`${lib.name || lib.id}: ${e.message || e}`);
+        }
+      }
+      results.sort((a, b) => b.score - a.score || b.preco - a.preco);
+      return { results, erros };
+    }
+
+    let libs = escolherBibliotecas(true);
+    let ufFallback = false;
+    if (!libraryId && uf && !libs.length) {
+      libs = escolherBibliotecas(false);
+      ufFallback = true;
+    }
+
+    let busca = await buscarEmBibliotecas(libs);
+    if (!libraryId && uf && !busca.results.length && !ufFallback) {
+      const libsSemUf = escolherBibliotecas(false);
+      busca = await buscarEmBibliotecas(libsSemUf);
+      libs = libsSemUf;
+      ufFallback = true;
+    }
+
+    const results = busca.results;
+    const erros = busca.erros;
     return new Response(JSON.stringify({
       ok: true,
       query: q,
       libraries: libs.map(({ _score, ...l }) => l),
       results: results.slice(0, limit),
       total_encontrado: results.length,
+      uf_fallback: ufFallback,
+      uf_solicitada: uf || "",
       erros
     }), { status: 200, headers });
   } catch (e) {
