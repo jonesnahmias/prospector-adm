@@ -8012,6 +8012,35 @@ function promptProjObraIA(){
   return prompt + '\n\n--- PROJETO ---\n' + projObraTexto.slice(0,50000);
 }
 
+function promptProjObraRecuperacaoIA(){
+  if(!projObraTexto){throw new Error('Carregue um projeto ou memorial primeiro.');}
+  var obra = obraAtualIA() || {};
+  var ctx = document.getElementById('proj-obra-ctx') ? document.getElementById('proj-obra-ctx').value.trim() : '';
+  var fotosQtd = (typeof fotosProjetoApoio !== 'undefined' && Array.isArray(fotosProjetoApoio)) ? fotosProjetoApoio.length : 0;
+  var apoio = '';
+  if(typeof getContextoApoioIAObra === 'function') apoio = getContextoApoioIAObra({orcamento:true, cronograma:true}).slice(0,3500);
+  return [
+    'Voce e engenheiro civil senior. A tentativa completa demorou; gere uma ANALISE TECNICA DE PROJETO em modo enxuto, mas util para decisao de obra.',
+    'Nao seja generico. Extraia o que o texto permite inferir e registre pendencias quando faltar planta, corte, memorial, detalhe construtivo ou especificacao.',
+    'Cruze projeto, obra, orcamento/cronograma de apoio e fotos. Ha '+fotosQtd+' foto(s) de apoio da situacao existente.',
+    'Retorne SOMENTE JSON valido sem markdown, com esta estrutura:',
+    '{"tipo_obra":"","area_total":"","padrao":"","pavimentos":"","sistema_estrutural":"","estimativa_custo":"","resumo_executivo":"","evidencias":[],"escopo_tecnico":[],"ambientes":[],"esquadrias":[],"etapas_execucao":[],"materiais":[],"verificacoes":[],"incompatibilidades":[],"pendencias":[],"riscos":[],"alertas":[],"controles_qualidade":[],"plano_acao":[],"recomendacoes":[]}',
+    '',
+    'DADOS DA OBRA:',
+    'Nome: '+(obra.nome||''),
+    'Tipo: '+(obra.tipo||''),
+    'Local: '+(obra.local||''),
+    'Area: '+(obra.area||''),
+    'Valor: '+(obra.valor||obra.contrato||''),
+    'Descricao: '+String(obra.desc||'').slice(0,1600),
+    ctx ? 'Contexto adicional: '+ctx : '',
+    apoio,
+    '',
+    'TEXTO EXTRAIDO DO PROJETO/MEMORIAL:',
+    String(projObraTexto||'').slice(0,12000)
+  ].filter(Boolean).join('\n');
+}
+
 function promptObraModuloIA(modulo){
   var obra = obraAtualIA();
   if(!obra) throw new Error('Abra uma obra antes de usar esta análise.');
@@ -8269,6 +8298,11 @@ function gerarAnaliseProjetoLocalEngenhariaV2(){
   var obra = ctx.obra;
   var texto = String(projObraTexto || '') + '\n' + [obra.nome,obra.tipo,obra.local,obra.end,obra.desc].filter(Boolean).join('\n');
   var t = texto.toLowerCase();
+  var linhas = String(projObraTexto || '').split(/\n+/).map(function(l){return l.replace(/\s+/g,' ').trim();}).filter(Boolean);
+  var evidencias = linhas.filter(function(l){
+    return /planta|corte|fachada|area|área|m2|m²|pavimento|fundacao|fundação|pilar|viga|laje|cobertura|telha|piso|parede|porta|janela|eletric|hidraul|sanitario|banheiro|demol|reforma|recupera|patologia|instala/i.test(l);
+  }).slice(0,12);
+  if(!evidencias.length) evidencias = linhas.slice(0,8);
   var pav = ctx.pav;
   var reforma = /reforma|recupera|adequacao|adequação|demol|existente|patologia|paiol|base aerea|base aérea/i.test(texto);
   var areaTxt = obra.area ? (obra.area + ' m2') : '';
@@ -8324,10 +8358,32 @@ function gerarAnaliseProjetoLocalEngenhariaV2(){
     {risco:'Servicos ocultos em reforma nao refletidos no projeto',probabilidade:'media',impacto:'alto',mitigacao:'Criar contingencia tecnica e registrar premissas/exclusoes.'},
     {risco:'Instalacoes e acabamentos sem especificacao completa',probabilidade:'media',impacto:'medio',mitigacao:'Solicitar memorial, quadro de esquadrias e especificacoes por ambiente.'}
   ];
+  var escopoTecnico = pav ? [
+    {item:'Validar geometria viaria',detalhe:'Confirmar extensao, largura, greide, secoes tipo, drenagem e interferencias.'},
+    {item:'Estrutura do pavimento',detalhe:'Confirmar subleito, sub-base/base, imprimacao, pintura de ligacao, CBUQ/CAP e espessuras.'},
+    {item:'Controle tecnologico',detalhe:'Definir ensaios, criterios de aceitacao, temperatura, compactacao e liberacoes.'}
+  ] : [
+    {item:'Levantamento existente',detalhe:'Conferir dimensoes, patologias, demolicoes, remocoes e areas afetadas pelas fotos/vistoria.'},
+    {item:'Compatibilizacao de disciplinas',detalhe:'Cruzar arquitetonico, estrutural, eletrico, hidrossanitario, cobertura e acabamentos.'},
+    {item:'Metodologia executiva',detalhe:'Separar protecoes, demolicoes, recuperacoes, instalacoes, recomposicoes, acabamentos, testes e limpeza.'}
+  ];
+  var verificacoes = [
+    {item:'Documentos de projeto',detalhe:'Verificar se ha planta baixa, cortes, fachadas, detalhes, memoriais e especificacoes suficientes.'},
+    {item:'ART/RRT e responsabilidade tecnica',detalhe:'Confirmar responsaveis pelos projetos e pela execucao.'},
+    {item:'Orcamento x projeto',detalhe:'Comparar itens do orcamento com o escopo grafico e fotos para localizar omissoes.'},
+    {item:'Cronograma x frentes reais',detalhe:'Checar se as etapas previstas respeitam dependencias tecnicas e liberacoes.'}
+  ];
+  var pendencias = [
+    {item:'Vistoria tecnica',detalhe:'Registrar medidas, estado existente, pontos criticos das fotos e interferencias antes da proposta final.'},
+    {item:'Memorial/especificacoes',detalhe:'Solicitar especificacao de materiais, acabamentos, sistemas e criterios de medicao.'},
+    {item:'Quantitativos',detalhe:'Conferir areas, comprimentos, volumes, esquadrias, pontos de instalacoes e perdas.'}
+  ];
   var alertas = [
-    {tipo:'FALLBACK_LOCAL',item:'Analise de projeto',detalhe:'A IA externa demorou; o app gerou esta analise tecnica local para nao deixar o modulo sem resposta.'},
     {tipo:'VALIDACAO_TECNICA',item:'Fonte do projeto',detalhe:'Confirmar dados em plantas originais, cortes, memoriais, fotos e vistoria de campo.'}
   ];
+  if(evidencias.length < 3){
+    alertas.push({tipo:'TEXTO_LIMITADO',item:'Texto extraido do PDF',detalhe:'O texto extraido trouxe poucos elementos tecnicos; priorize leitura visual das pranchas/fotos e memorial complementar.'});
+  }
   if((typeof fotosProjetoApoio !== 'undefined') && Array.isArray(fotosProjetoApoio) && fotosProjetoApoio.length){
     alertas.push({tipo:'FOTOS_APOIO',item:'Fotos de apoio',detalhe:fotosProjetoApoio.length+' foto(s) anexada(s); usar para validar patologias, acesso, fachada, instalacoes e estado existente.'});
   }
@@ -8337,13 +8393,34 @@ function gerarAnaliseProjetoLocalEngenhariaV2(){
     padrao: /alto|luxo|padrao alto|padrão alto/i.test(texto) ? 'Padrao alto' : (/baixo|simples|economico/i.test(texto) ? 'Padrao economico/simples' : 'Padrao a confirmar por memorial'),
     pavimentos: pavimentos || (pav ? 'Nao aplicavel' : 'Nao identificado'),
     sistema_estrutural: estrutural,
+    resumo_executivo: pav ? 'Analise identifica escopo de infraestrutura/pavimentacao. A decisao tecnica deve se concentrar em secoes do pavimento, drenagem, controle tecnologico, usina/transporte e equipamentos de aplicacao/compactacao.' : 'Analise identifica obra/reforma que depende de compatibilizacao entre projeto, fotos da situacao existente, orcamento e cronograma. O risco principal e fechar custo/prazo sem validar patologias, demolicoes, instalacoes e acabamentos.',
+    evidencias: evidencias.map(function(e){return {descricao:e};}),
+    escopo_tecnico: escopoTecnico,
     estimativa_custo: ctx.total ? ('R$ '+Number(ctx.total).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})) : 'Usar orcamento/análise de orcamento vinculada para custo confiavel',
     ambientes: ambientes,
     esquadrias: reforma && !pav ? [{tipo:'Portas/janelas/esquadrias',dimensoes:'A confirmar em planta/quadro',material:'A confirmar',quantidade:0,observacao:'Necessario quadro de esquadrias ou levantamento in loco.'}] : [],
     etapas_execucao: etapas,
     materiais: materiais,
+    verificacoes: verificacoes,
+    incompatibilidades: [
+      {item:'Projeto x fotos',detalhe:'Conferir se as fotos de apoio mostram patologias, interferencias ou servicos nao refletidos no PDF.'},
+      {item:'Projeto x orcamento',detalhe:'Checar se todos os servicos executivos aparecem no orcamento, inclusive protecoes, remocoes, limpeza, ensaios, mobilizacao e descarte.'}
+    ],
+    pendencias: pendencias,
     riscos: riscos,
     alertas: alertas,
+    controles_qualidade: pav ? [
+      {item:'Base/sub-base',detalhe:'Controle de compactacao, granulometria, umidade e liberacao por ensaio.'},
+      {item:'CBUQ/CAP',detalhe:'Temperatura, taxa, espessura, grau de compactacao, acabamento e rastreabilidade.'}
+    ] : [
+      {item:'Recebimento de materiais',detalhe:'Conferir especificacao, marca equivalente, lote, nota e armazenamento.'},
+      {item:'Servicos executados',detalhe:'Checklist por etapa, fotos, diario, ensaios/testes e aceite antes de fechamento.'}
+    ],
+    plano_acao: [
+      {acao:'Conferir documentos',prazo:'Antes de fechar proposta',responsavel:'Engenharia',resultado:'Lista de projetos/memoriais faltantes e premissas registradas.'},
+      {acao:'Vistoriar campo e fotos',prazo:'Antes da mobilizacao',responsavel:'RT / mestre',resultado:'Mapa de interferencias, patologias e servicos ocultos.'},
+      {acao:'Compatibilizar com orcamento e cronograma',prazo:'Antes do contrato/ordem de servico',responsavel:'Orcamentista + planejamento',resultado:'Itens omitidos, riscos e contingencia tecnica definidos.'}
+    ],
     recomendacoes: [
       'Solicitar/validar plantas completas, cortes, fachadas, memoriais, ART/RRT e especificacoes antes da execucao.',
       'Cruzar projeto com orcamento e cronograma para identificar servicos omitidos, interferencias e itens de maior risco.',
@@ -8477,7 +8554,7 @@ async function analisarModuloIA(modulo,btn){
   try{
     var prompt = promptModuloIA(modulo);
     var maxTokens = {plan:2600,canteiro:2800,dim:3400,cron:2200,forn:1800,'orcamento-geral':(orcTipo==='completo'?4800:3600),'orc-obra':(orcObraTipo==='completo'?4800:3600),'proj-obra':3600}[modulo] || 3000;
-    var timeoutMs = modulo==='forn' ? 16000 : ((modulo==='dim' || modulo==='plan') ? 38000 : (((modulo==='orc-obra' && orcObraTipo==='completo') || (modulo==='orcamento-geral' && orcTipo==='completo')) ? 40000 : 32000));
+    var timeoutMs = modulo==='forn' ? 16000 : (modulo==='proj-obra' ? 44000 : ((modulo==='dim' || modulo==='plan') ? 38000 : (((modulo==='orc-obra' && orcObraTipo==='completo') || (modulo==='orcamento-geral' && orcTipo==='completo')) ? 40000 : 32000)));
     var resumoOrcAtual = modulo==='orc-obra' ? orcObraResumoArquivo : (modulo==='orcamento-geral' ? orcResumoArquivo : null);
     if(resumoOrcAtual){
       maxTokens = 2800;
@@ -8495,8 +8572,13 @@ async function analisarModuloIA(modulo,btn){
         setStatusModuloIA(modulo,'A IA demorou. Gerando analise local confiavel com os dados extraidos da planilha...','#f5c842');
         j = {json:criarAnaliseOrcamentoArquivo(resumoOrcAtual)};
       }else if(modulo==='proj-obra' && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
-        setStatusModuloIA(modulo,'A IA demorou. Gerando analise de projeto local com Motor Engenharia v2...','#f5c842');
-        j = {json:gerarAnaliseProjetoLocalEngenhariaV2()};
+        setStatusModuloIA(modulo,'A tentativa completa demorou. Refazendo Projeto em modo tecnico enxuto...','#f5c842');
+        try{
+          j = await chamarIA({modulo:modulo,prompt:promptProjObraRecuperacaoIA(),max_output_tokens:3600,timeout_ms:38000,engineering_v2:true,truth:dadosConfiaveisModuloIA(modulo)});
+        }catch(segundoErro){
+          setStatusModuloIA(modulo,'Gerando analise de projeto local com Motor Engenharia v2...','#f5c842');
+          j = {json:gerarAnaliseProjetoLocalEngenhariaV2()};
+        }
       }else if(modulo==='plan' && /demorou|timeout|time|falha|incompleta/i.test(String(primeiroErro&&primeiroErro.message||''))){
         setStatusModuloIA(modulo,'A IA demorou. Gerando planejamento local com Motor Engenharia v2...','#f5c842');
         j = {json:gerarPlanejamentoLocalEngenhariaV2()};
@@ -8730,10 +8812,20 @@ function renderAnaliseProj(j){
     if(val) html += '<div class="dado"><div class="dlabel">'+escHTML(c[0])+'</div><div class="dval" style="word-break:break-word;overflow-wrap:anywhere">'+escHTML(val)+'</div></div>';
   });
   html += '</div>';
+  if(j.resumo_executivo){
+    html += '<div style="margin-top:12px;background:#071828;border:1px solid #1e3a5f;border-left:3px solid #00c896;border-radius:8px;padding:11px 13px;font-size:12px;color:#c8d8e8;line-height:1.65">'+escHTML(valorProjetoTexto(j.resumo_executivo))+'</div>';
+  }
+  html += renderListaProjeto('Evidencias extraidas do projeto', j.evidencias, 12, '•', '#8ab4ff');
+  html += renderListaProjeto('Escopo tecnico inferido', j.escopo_tecnico||j.escopo, 12, '•', '#4aa3ff');
   html += renderListaProjeto('Ambientes', j.ambientes||j.programa_ambientes||j.quadro_areas, 20, '•', '#4aa3ff');
   html += renderListaProjeto('Esquadrias', j.esquadrias||j.quadro_esquadrias, 15, '🚪', '#4aa3ff');
   html += renderListaProjeto('Etapas de Execução', j.etapas_execucao||j.etapas, 15, '→', '#4aa3ff');
   html += renderListaProjeto('Insumos / Materiais', j.insumos||j.materiais, 15, '•', '#4aa3ff');
+  html += renderListaProjeto('Verificacoes obrigatorias', j.verificacoes||j.checklist_validacao, 12, 'OK', '#00c896');
+  html += renderListaProjeto('Incompatibilidades / pontos criticos', j.incompatibilidades||j.conflitos, 12, '!', '#ff6b6b');
+  html += renderListaProjeto('Pendencias antes de contratar/executar', j.pendencias||j.pontos_a_confirmar, 12, '?', '#f5c842');
+  html += renderListaProjeto('Controles de qualidade', j.controles_qualidade||j.controle_qualidade, 12, 'CQ', '#8ab4ff');
+  html += renderListaProjeto('Plano de acao', j.plano_acao||j.proximos_passos, 12, '>', '#00c896');
   html += renderListaProjeto('Riscos', j.riscos, 12, '⚠️', '#f5c842');
   html += renderListaProjeto('Alertas', j.alertas, 12, '⚠️', '#f5c842');
   html += renderListaProjeto('Recomendações', j.recomendacoes||j.recomendações, 12, '✓', '#00c896');
