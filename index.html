@@ -2028,6 +2028,7 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
           <div style="font-size:11px;color:#4a6a8a;margin-top:2px" id="gastos-count">Controle financeiro de despesas reais</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="btn-capital-centro" class="bai" onclick="definirCapitalCentroAtual()" style="display:none;background:linear-gradient(135deg,#3b2f00,#f5c842);color:#000;font-size:11px;padding:7px 14px;font-weight:800">💵 Definir capital</button>
           <button class="bai" onclick="abrirFormGasto(null)" style="background:linear-gradient(135deg,#0057b7,#00a8e8);font-size:11px;padding:7px 14px">+ Novo Gasto</button>
           <button class="bai" onclick="marcarGastosPagosSelecionados()" style="background:linear-gradient(135deg,#005f20,#00c896);color:#000;font-size:11px;padding:7px 12px;font-weight:800">💰 Marcar pagos</button>
           <button class="bai grey" onclick="exportarGastosCsv()" style="font-size:11px;padding:7px 12px">📄 Exportar CSV</button>
@@ -7328,7 +7329,7 @@ function calcResumoGastos(o){
   var pago=lista.filter(function(g){return g.status==='pago';}).reduce(function(t,g){return t+parseMedNumero(g.valor_realizado || g.valor_previsto);},0);
   var pendente=lista.filter(function(g){return g.status!=='pago';}).reduce(function(t,g){return t+parseMedNumero(g.valor_realizado || g.valor_previsto);},0);
   var med=typeof calcResumoMedicoes==='function' ? calcResumoMedicoes(o) : {pagas:0};
-  var caixa=parseMedNumero(med.pagas)-pago;
+  var caixa=(o&&o.centroFinanceiro) ? base-pago : parseMedNumero(med.pagas)-pago;
   var pct=base>0?(realizado/base*100):0;
   return {qtd:lista.length,base:base,previsto:previsto,realizado:realizado,pago:pago,pendente:pendente,caixa:caixa,percentual:pct,medicoesPagas:parseMedNumero(med.pagas)};
 }
@@ -7352,6 +7353,11 @@ function renderGastosObra(obra){
   var centro=!!o.centroFinanceiro;
   var tit=document.getElementById('gastos-titulo');
   if(tit) tit.textContent=centro?'Controle de Gastos do Centro de Custo':'Controle de Gastos da Obra';
+  var btnCapital=document.getElementById('btn-capital-centro');
+  if(btnCapital){
+    btnCapital.style.display=centro?'inline-flex':'none';
+    btnCapital.textContent=centro && valorBaseGastos(o)>0 ? '💵 Editar capital' : '💵 Definir capital';
+  }
   var info=document.getElementById('gastos-info-box');
   if(info){
     info.innerHTML=centro
@@ -12555,6 +12561,9 @@ function abrirObraCompletaAtual(){
     var tipo=prompt('Tipo do centro: obra, escritorio ou outros', nome.toLowerCase().indexOf('escrit')>=0?'escritorio':'outros');
     tipo=String(tipo||'outros').trim().toLowerCase();
     if(['obra','escritorio','outros'].indexOf(tipo)<0) tipo='outros';
+    var capitalInicial=prompt('Capital/saldo inicial do centro de custo (R$):', '0');
+    if(capitalInicial===null) capitalInicial='0';
+    capitalInicial=parseMedNumero(capitalInicial);
     var centro={
       id:'centro_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
       nome:nome,
@@ -12565,6 +12574,7 @@ function abrirObraCompletaAtual(){
       local:'',
       cliente:tipoCentroLabel({centroFinanceiro:true,tipoCentro:tipo}),
       desc:'Centro de custo financeiro',
+      valor_base_financeiro:capitalInicial,
       gastos:[],
       historico:[{tipo:'criacao',data:new Date().toLocaleDateString('pt-BR'),txt:'Centro de custo criado: '+nome}]
     };
@@ -12609,11 +12619,14 @@ function abrirObraCompletaAtual(){
     if(['obra','escritorio','outros'].indexOf(tipo)<0) tipo='outros';
     var desc=prompt('Descrição/observação:', textoFinanceiro(centro.desc||'Centro de custo financeiro'));
     if(desc===null) return;
+    var capital=prompt('Capital/saldo inicial do centro de custo (R$):', String(valorBaseGastos(centro)||0).replace('.',','));
+    if(capital===null) return;
     centro.nome=nome;
     centro.tipoCentro=tipo;
     centro.tipo=tipo==='escritorio'?'Escritório':(tipo==='obra'?'Obra':'Centro de custo');
     centro.cliente=tipoCentroLabel({centroFinanceiro:true,tipoCentro:tipo});
     centro.desc=textoFinanceiro(desc||'Centro de custo financeiro');
+    centro.valor_base_financeiro=parseMedNumero(capital);
     centro.historico=Array.isArray(centro.historico)?centro.historico:[];
     centro.historico.push({tipo:'edicao',data:new Date().toLocaleDateString('pt-BR'),txt:'Centro de custo atualizado: '+nome});
     lista[idx]=centro;
@@ -12625,9 +12638,38 @@ function abrirObraCompletaAtual(){
     }
     if(typeof atualizarDashboardHome==='function') atualizarDashboardHome();
   }
+  function definirCapitalCentroCustoFinanceiro(id){
+    var lista=todosCentrosFinanceiros();
+    var idx=lista.findIndex(function(o){return String(o.id)===String(id) && o.centroFinanceiro;});
+    if(idx<0){alert('Centro de custo não encontrado.');return;}
+    var centro=Object.assign({},lista[idx]);
+    var atual=valorBaseGastos(centro);
+    var v=prompt('Capital/saldo inicial disponível para "'+centroFinanceiroNome(centro)+'" (R$):', String(atual||0).replace('.',','));
+    if(v===null) return;
+    var capital=parseMedNumero(v);
+    centro.valor_base_financeiro=capital;
+    centro.historico=Array.isArray(centro.historico)?centro.historico:[];
+    centro.historico.push({tipo:'capital',data:new Date().toLocaleDateString('pt-BR'),txt:'Capital do centro definido em '+fmtMedMoeda(capital)});
+    lista[idx]=centro;
+    saveObras(lista);
+    if(String(obraAtual||'')===String(id)){
+      renderFinanceiroDestaqueObra(centro);
+      renderGastosObra(centro);
+      renderHist(centro);
+      renderDetResumo(Object.assign({},centro,{desc:centro.desc||'Centro de custo para lançamentos financeiros.'}));
+    }
+    renderFinanceiroPainel(false);
+    if(typeof atualizarDashboardHome==='function') atualizarDashboardHome();
+  }
+  function definirCapitalCentroAtual(){
+    if(!obraAtual){alert('Abra um centro de custo primeiro.');return;}
+    definirCapitalCentroCustoFinanceiro(obraAtual);
+  }
   window.criarCentroCustoFinanceiro=criarCentroCustoFinanceiro;
   window.excluirCentroCustoFinanceiro=excluirCentroCustoFinanceiro;
   window.editarCentroCustoFinanceiro=editarCentroCustoFinanceiro;
+  window.definirCapitalCentroCustoFinanceiro=definirCapitalCentroCustoFinanceiro;
+  window.definirCapitalCentroAtual=definirCapitalCentroAtual;
 
   window.financeiroObras=function(){ return todosCentrosFinanceiros(); };
 
