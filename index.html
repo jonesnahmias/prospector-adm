@@ -7694,11 +7694,13 @@ function promptConsultaTecnica(){
   return [
     'Voce e um engenheiro civil senior, orcamentista e especificador tecnico no Brasil.',
     'Responda de forma pratica para obra real, sem generalidades.',
+    'Quando existir parametro usual de engenharia reconhecido, responda com valor numerico de referencia e faixa usual. Exemplo: imprimação com CM-30 sobre base granular/solo estabilizado costuma adotar taxa de referencia de 1,5 L/m2, com ajuste por textura/absorção, normalmente em faixa aproximada de 0,8 a 1,6 L/m2 conforme especificacao, teste de campo e norma/órgão contratante.',
+    'Para pavimentacao, informe taxas usuais quando a pergunta pedir consumo/aplicacao: imprimação CM-30, pintura de ligacao RR-1C/RR-2C, CBUQ por espessura/densidade, compactacao, ensaios e liberacao.',
     'Se envolver preco/custo, NAO invente valor exato. Informe que deve ser validado por SINAPI/SICRO/ORCC/cotacao e descreva como orcar.',
     'Se envolver produto/material, informe aplicacao, quando usar, quando nao usar, preparo de superficie/base, execucao, controle de qualidade, riscos e alternativas.',
     'Se envolver especificacao, gere texto tecnico pronto para memorial/orcamento.',
     'Retorne SOMENTE JSON valido sem markdown neste formato:',
-    '{"resposta_direta":"","aplicacao_recomendada":[],"quando_usar":[],"quando_nao_usar":[],"especificacao_tecnica":"","criterios_qualidade":[],"normas_referencias":[],"custo_referencia":{"orientacao":"","bases":[],"composicoes_sugeridas":[]},"alternativas":[],"riscos":[],"texto_memorial":"","proximos_passos":[],"alertas":[]}',
+    '{"resposta_direta":"","valor_referencia":"","faixa_usual":"","observacao_tecnica":"","aplicacao_recomendada":[],"quando_usar":[],"quando_nao_usar":[],"especificacao_tecnica":"","criterios_qualidade":[],"normas_referencias":[],"custo_referencia":{"orientacao":"","bases":[],"composicoes_sugeridas":[]},"alternativas":[],"riscos":[],"texto_memorial":"","proximos_passos":[],"alertas":[]}',
     '',
     'TIPO DE CONSULTA: '+d.tipo,
     'AREA: '+d.area,
@@ -7713,14 +7715,21 @@ function promptConsultaTecnica(){
 function gerarConsultaTecnicaLocal(d){
   var q = String((d&&d.pergunta)||'').toLowerCase();
   var pav = /cb[uú]q|asfalto|cap\b|pavimenta|base|sub-base|imprima|pintura de liga/i.test(q+' '+(d&&d.area));
+  var cm30 = /cm[-\s]?30|imprima/i.test(q);
+  var pinturaLigacao = /pintura de liga|rr[-\s]?[12]c|emuls[aã]o/i.test(q);
   var imp = /impermeabil|manta|infiltra|laje|umidade/i.test(q+' '+(d&&d.area));
   var concreto = /concreto|graute|argamassa|fck|armadura|pilar|viga|laje/i.test(q+' '+(d&&d.area));
-  var resposta = pav ? 'Para pavimentacao/asfalto, a decisao tecnica deve validar camada, trafego, base/sub-base, drenagem, usina, transporte, aplicacao e compactacao.' :
+  var resposta = cm30 ? 'Para imprimação com CM-30 sobre base de solo/base granular, adote como referência prática 1,5 L/m2. A taxa deve ser ajustada em campo conforme textura, umidade, absorção e especificação do órgão contratante.' :
+    (pinturaLigacao ? 'Para pintura de ligação com emulsão asfáltica, use taxa menor que a imprimação: referência usual em torno de 0,3 a 0,8 L/m2 de emulsão, ajustada conforme superfície e especificação.' :
+    (pav ? 'Para pavimentacao/asfalto, a decisao tecnica deve validar camada, trafego, base/sub-base, drenagem, usina, transporte, aplicacao e compactacao.' :
     (imp ? 'Para impermeabilizacao, escolha o sistema conforme exposicao, movimentacao da base, trafego, protecao mecanica e detalhamento dos ralos/rodapes.' :
     (concreto ? 'Para concreto/argamassas/grautes, especifique desempenho, preparo da base, cura, controle tecnologico e compatibilidade com a solicitacao.' :
-    'A resposta depende do uso, substrato, ambiente, desempenho esperado, custo de ciclo de vida e disponibilidade local. Use a orientacao abaixo como base tecnica inicial.'));
+    'A resposta depende do uso, substrato, ambiente, desempenho esperado, custo de ciclo de vida e disponibilidade local. Use a orientacao abaixo como base tecnica inicial.'))));
   return {
     resposta_direta: resposta,
+    valor_referencia: cm30 ? '1,5 L/m2' : (pinturaLigacao ? '0,3 a 0,8 L/m2' : ''),
+    faixa_usual: cm30 ? '0,8 a 1,6 L/m2, com 1,5 L/m2 como taxa padrao pratica quando a especificacao nao indicar outra.' : (pinturaLigacao ? '0,3 a 0,8 L/m2 conforme emulsao, textura e condicao da superficie.' : ''),
+    observacao_tecnica: cm30 ? 'Em base muito fechada/saturada, taxa alta pode exsudar e prejudicar aderencia; em base muito aberta/absorvente pode exigir ajuste. Aplicar somente com base limpa, seca ou com umidade dentro da especificacao, curada e liberada.' : '',
     aplicacao_recomendada: pav ? ['Revestimento asfaltico, recuperacao de vias, acessos, patios e areas de trafego conforme projeto.'] : (imp ? ['Lajes, coberturas, areas molhadas, reservatorios ou paredes sujeitas a umidade, conforme sistema escolhido.'] : ['Aplicar quando o material atender ao desempenho requerido e estiver compatibilizado com projeto, memorial e execucao.']),
     quando_usar: ['Quando houver especificacao tecnica clara, base preparada, equipe capacitada e controle de qualidade definido.'],
     quando_nao_usar: ['Quando o substrato/base nao estiver regularizado, houver umidade/incompatibilidade nao tratada ou faltar criterio de medicao e aceitacao.'],
@@ -7748,6 +7757,13 @@ function renderConsultaTecnica(j){
   var html = '<div class="consulta-result">';
   html += '<div class="consulta-title">Resposta tecnica</div>';
   html += '<div class="consulta-resposta">'+escHTML(j.resposta_direta || j.resposta || j.resumo || 'Consulta respondida.')+'</div>';
+  if(j.valor_referencia || j.faixa_usual || j.observacao_tecnica){
+    html += '<div class="dgrid" style="margin-bottom:10px">';
+    if(j.valor_referencia) html += '<div class="dado"><div class="dlabel">Valor de referencia</div><div class="dval">'+escHTML(j.valor_referencia)+'</div></div>';
+    if(j.faixa_usual) html += '<div class="dado"><div class="dlabel">Faixa usual</div><div class="dval">'+escHTML(j.faixa_usual)+'</div></div>';
+    if(j.observacao_tecnica) html += '<div class="dado" style="grid-column:1/-1"><div class="dlabel">Observacao tecnica</div><div class="dval">'+escHTML(j.observacao_tecnica)+'</div></div>';
+    html += '</div>';
+  }
   html += '<div class="listas">';
   html += consultaListaHtml('Aplicacao recomendada', j.aplicacao_recomendada || j.aplicacoes, '#00c896');
   html += consultaListaHtml('Quando usar', j.quando_usar, '#4a90d9');
