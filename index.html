@@ -7477,7 +7477,13 @@ function salvarGastoObra(){
   });
   saveObras(obras); var o=obras.find(function(x){return x.id===obraAtual;}); fecharFormGasto(); renderGastosObra(o); renderHist(o); renderDetResumo(o); renderFinanceiroDestaqueObra(o); atualizarDashboardHome();
 }
-function editarGastoObra(id){abrirFormGasto(id);}
+function editarGastoObra(id){
+  if(window.event && typeof window.event.stopPropagation==='function') window.event.stopPropagation();
+  var o=gastoObraAtual();
+  var g=getGastosObra(o).find(function(x){return String(x.id)===String(id);});
+  if(!g){alert('Gasto não encontrado. Atualize o controle financeiro e tente novamente.');return;}
+  abrirFormGasto(g.id);
+}
 function excluirGastoObra(id){
   if(!confirm('Excluir este gasto?'))return;
   var obras=getObras().map(function(o){ if(o.id!==obraAtual)return o; var g=(o.gastos||[]).find(function(x){return x.id===id;}); o.gastos=(o.gastos||[]).filter(function(x){return x.id!==id;}); o.historico=o.historico||[]; o.historico.push({data:new Date().toLocaleDateString('pt-BR'),txt:'💰 Gasto excluído: '+((g&&g.descricao)||'')}); return o; });
@@ -12572,8 +12578,41 @@ function abrirObraCompletaAtual(){
     renderFinanceiroPainel(false);
     if(typeof atualizarDashboardHome==='function') atualizarDashboardHome();
   }
+  function editarCentroCustoFinanceiro(id){
+    var lista=todosCentrosFinanceiros();
+    var idx=lista.findIndex(function(o){return String(o.id)===String(id) && o.centroFinanceiro;});
+    if(idx<0){alert('Centro de custo não encontrado.');return;}
+    var centro=Object.assign({},lista[idx]);
+    var nome=prompt('Nome do centro de custo:', centroFinanceiroNome(centro));
+    if(nome===null) return;
+    nome=textoFinanceiro(String(nome).trim());
+    if(!nome){alert('Informe um nome para o centro de custo.');return;}
+    var tipoAtual=String(centro.tipoCentro||'outros').toLowerCase();
+    var tipo=prompt('Tipo do centro: obra, escritorio ou outros', tipoAtual);
+    if(tipo===null) return;
+    tipo=String(tipo||'outros').trim().toLowerCase();
+    if(['obra','escritorio','outros'].indexOf(tipo)<0) tipo='outros';
+    var desc=prompt('Descrição/observação:', textoFinanceiro(centro.desc||'Centro de custo financeiro'));
+    if(desc===null) return;
+    centro.nome=nome;
+    centro.tipoCentro=tipo;
+    centro.tipo=tipo==='escritorio'?'Escritório':(tipo==='obra'?'Obra':'Centro de custo');
+    centro.cliente=tipoCentroLabel({centroFinanceiro:true,tipoCentro:tipo});
+    centro.desc=textoFinanceiro(desc||'Centro de custo financeiro');
+    centro.historico=Array.isArray(centro.historico)?centro.historico:[];
+    centro.historico.push({tipo:'edicao',data:new Date().toLocaleDateString('pt-BR'),txt:'Centro de custo atualizado: '+nome});
+    lista[idx]=centro;
+    saveObras(lista);
+    if(String(obraAtual||'')===String(id)){
+      abrirFinanceiroObra(id);
+    }else{
+      renderFinanceiroPainel(false);
+    }
+    if(typeof atualizarDashboardHome==='function') atualizarDashboardHome();
+  }
   window.criarCentroCustoFinanceiro=criarCentroCustoFinanceiro;
   window.excluirCentroCustoFinanceiro=excluirCentroCustoFinanceiro;
+  window.editarCentroCustoFinanceiro=editarCentroCustoFinanceiro;
 
   window.financeiroObras=function(){ return todosCentrosFinanceiros(); };
 
@@ -12659,6 +12698,18 @@ function abrirObraCompletaAtual(){
     inserirBannerFinanceiro(o);
     var form=document.getElementById('gasto-form'); if(form) form.style.display='none';
     window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  var editarObraAtualBase=window.editarObraAtual;
+  window.editarObraAtual=function(){
+    if(!obraAtual) return;
+    var atual=todosCentrosFinanceiros().find(function(x){return String(x.id)===String(obraAtual);});
+    if(atual && atual.centroFinanceiro) return editarCentroCustoFinanceiro(obraAtual);
+    financeiroModoAtivo=false;
+    document.body.classList.remove('financeiro-modo');
+    var b=document.getElementById('financeiro-modo-banner'); if(b)b.remove();
+    mostrarSecao('obras');
+    return typeof editarObraAtualBase==='function' ? editarObraAtualBase() : (typeof abrirFormObra==='function' ? abrirFormObra(obraAtual) : null);
   };
 })();
 
