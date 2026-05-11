@@ -2571,11 +2571,13 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
         </div>
         <div class="btns" style="margin-top:12px">
           <button class="bai" id="btn-consulta-ia" onclick="consultarTecnicaIA()" style="background:linear-gradient(135deg,#005f20,#00c896);color:#001;font-weight:900">Consultar IA</button>
+          <button class="bai" onclick="sincronizarOrccConsulta()" style="background:linear-gradient(135deg,#0b3a66,#4a90d9)">Sincronizar ORCC</button>
           <button class="bai" onclick="copiarPromptConsultaTecnica()" style="background:linear-gradient(135deg,#0057b7,#00a8e8)">Copiar Prompt</button>
           <button class="bai" onclick="renderHistoricoConsultaTecnica(true)" style="background:linear-gradient(135deg,#3b2f00,#f5c842);color:#000">Historico</button>
           <button class="bai grey" onclick="limparConsultaTecnica()">Limpar</button>
         </div>
         <div id="consulta-status" style="font-size:12px;color:#4a90d9;margin-top:8px;min-height:16px"></div>
+        <div id="consulta-orcc-status" style="font-size:12px;color:#8a9bb0;margin-top:4px;min-height:16px"></div>
         <div id="consulta-result"></div>
       </div>
       <div class="consulta-panel">
@@ -7688,6 +7690,63 @@ function consultaTecnicaDados(){
   };
 }
 
+function consultaOrccCacheKey(){return consultaTecnicaKey()+'_orcc_libraries';}
+
+function consultaNum(v){
+  if(typeof v==='number' && isFinite(v)) return v;
+  var s=String(v||'').replace(/[^\d,.\-]/g,'');
+  if(!s) return 0;
+  var n=s.indexOf(',')>=0 && s.indexOf('.')>=0 ? Number(s.replace(/\./g,'').replace(',','.')) : Number(s.replace(',','.'));
+  return isFinite(n)?n:0;
+}
+
+function consultaBrl(v){
+  var n=consultaNum(v);
+  return n?n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):'--';
+}
+
+function taxaAplicacaoConsulta(j, pergunta){
+  var txt=String((j&&j.valor_referencia)||'')+' '+String(pergunta||'');
+  var m=txt.match(/(\d+(?:[,.]\d+)?)\s*l\s*\/?\s*m[²2]/i);
+  if(m) return consultaNum(m[1]);
+  if(/cm[-\s]?30|imprima/i.test(txt)) return 1.5;
+  if(/pintura\s+de\s+liga|rr[-\s]?[12]c/i.test(txt)) return 0.5;
+  return 0;
+}
+
+async function sincronizarOrccConsulta(){
+  var st=document.getElementById('consulta-orcc-status')||document.getElementById('consulta-status');
+  if(st){st.style.color='#4a90d9';st.textContent='Sincronizando bibliotecas do ORCC...';}
+  try{
+    var r=await fetch('/api/orcc-precos?mode=libraries');
+    var data=await r.json().catch(function(){return {};});
+    if(!r.ok || data.error) throw new Error(data.error||'Falha ao sincronizar ORCC.');
+    localStorage.setItem(consultaOrccCacheKey(), JSON.stringify(data.libraries||[]));
+    if(st){st.style.color='#00c896';st.textContent='ORCC sincronizado: '+((data.libraries||[]).length)+' biblioteca(s) disponíveis.';}
+    return data.libraries||[];
+  }catch(e){
+    if(st){st.style.color='#e84545';st.textContent=(e&&e.message)||'Erro ao sincronizar ORCC.';}
+    return [];
+  }
+}
+
+async function buscarPrecosOrccConsulta(d){
+  var q=String((d&&d.pergunta)||'').trim();
+  if(q.length<2) return {results:[]};
+  var st=document.getElementById('consulta-orcc-status');
+  if(st){st.style.color='#4a90d9';st.textContent='Consultando preços no ORCC...';}
+  var params=new URLSearchParams({q:q,limit:'12'});
+  if(d&&d.uf) params.set('uf',d.uf);
+  var r=await fetch('/api/orcc-precos?'+params.toString());
+  var data=await r.json().catch(function(){return {};});
+  if(!r.ok || data.error) throw new Error(data.error||'Falha na consulta ORCC.');
+  if(st){
+    st.style.color=(data.results&&data.results.length)?'#00c896':'#f5c842';
+    st.textContent=(data.results&&data.results.length)?('ORCC: '+data.results.length+' preço(s) encontrado(s).'):'ORCC: nenhum preço encontrado para esta busca.';
+  }
+  return data;
+}
+
 function promptConsultaTecnica(){
   var d = consultaTecnicaDados();
   if(!String(d.pergunta||'').trim()) throw new Error('Digite a pergunta ou item tecnico.');
@@ -7778,11 +7837,25 @@ function renderConsultaTecnica(j){
   if(j.custo_referencia){
     html += '<div class="tbox" style="margin-top:10px;border-left-color:#f5c842"><div class="ttitle" style="color:#f5c842">Custo / referencia</div><div style="font-size:12px;color:#c8d8e8;line-height:1.65">'+escHTML(editalValorTextoBruto(j.custo_referencia))+'</div></div>';
   }
+  html += renderPrecosOrccConsulta(j);
   if(j.texto_memorial) html += '<div class="tbox" style="margin-top:10px"><div class="ttitle">Texto para memorial/orcamento</div><textarea class="fi" rows="5" readonly>'+escHTML(j.texto_memorial)+'</textarea></div>';
   html += "<div class=\"btns\" style=\"margin-top:10px\"><button class=\"bai\" onclick=\"salvarConsultaAtualBiblioteca()\" style=\"background:linear-gradient(135deg,#005f20,#00c896);color:#001\">Salvar na biblioteca</button><button class=\"bai grey\" onclick=\"copiarTextoClipboard((consultaAtualTecnica&&consultaAtualTecnica.texto_memorial)||JSON.stringify(consultaAtualTecnica,null,2),'#consulta-status','Copiado.')\">Copiar resposta</button></div>";
   html += '</div>';
   var el = document.getElementById('consulta-result');
   if(el) el.innerHTML = html;
+}
+
+function renderPrecosOrccConsulta(j){
+  var lista = (j&&j.precos_orcc&&Array.isArray(j.precos_orcc.results)) ? j.precos_orcc.results : [];
+  if(!lista.length) return '';
+  var d = consultaTecnicaDados();
+  var taxa = taxaAplicacaoConsulta(j, d.pergunta);
+  var rows = lista.slice(0,10).map(function(x){
+    var preco = consultaNum(x.preco);
+    var custoTaxa = taxa && /^(l|litro|litros)$/i.test(String(x.unidade||'')) ? preco*taxa : 0;
+    return '<tr><td>'+escHTML(x.codigo||'')+'</td><td>'+escHTML(x.descricao||'')+'</td><td>'+escHTML(x.unidade||'')+'</td><td>'+escHTML(x.preco_fmt||consultaBrl(preco))+'</td><td>'+escHTML([x.fonte,x.uf,x.mes].filter(Boolean).join(' / '))+'</td><td>'+escHTML(custoTaxa?consultaBrl(custoTaxa):'--')+'</td></tr>';
+  }).join('');
+  return '<div class="tbox" style="margin-top:10px;border-left-color:#00c896"><div class="ttitle" style="color:#00c896">Preços sincronizados do ORCC</div><div style="font-size:12px;color:#8a9bb0;margin-bottom:8px">Fonte: ORCC direto. '+(taxa?'Cálculo com taxa de aplicação: '+escHTML(String(taxa).replace('.',','))+' L/m².':'')+'</div><div style="overflow-x:auto"><table class="orc-table"><thead><tr><th>Código</th><th>Descrição</th><th>Un.</th><th>Preço unit.</th><th>Fonte</th><th>Custo por m²</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
 }
 
 var consultaAtualTecnica = null;
@@ -7794,16 +7867,27 @@ async function consultarTecnicaIA(){
   if(!String(d.pergunta||'').trim()){ if(st){st.style.color='#e84545';st.textContent='Digite a pergunta ou item tecnico.';} return; }
   if(st){st.style.color='#4a90d9';st.textContent='Consultando IA tecnica...';}
   if(btn){btn.disabled=true;btn.textContent='Consultando...';}
+  var precosOrcc = null;
+  try{precosOrcc = await buscarPrecosOrccConsulta(d);}catch(eOrcc){
+    var sto=document.getElementById('consulta-orcc-status');
+    if(sto){sto.style.color='#f5c842';sto.textContent='ORCC indisponível nesta tentativa: '+((eOrcc&&eOrcc.message)||'falha');}
+  }
   try{
-    var r = await fetch('/api/ia-json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo:'consulta-tecnica',prompt:promptConsultaTecnica(),max_output_tokens:2800,timeout_ms:30000})});
+    var promptTec = promptConsultaTecnica();
+    if(precosOrcc && Array.isArray(precosOrcc.results) && precosOrcc.results.length){
+      promptTec += '\n\nPREÇOS ORCC SINCRONIZADOS (usar como fonte de preço, sem inventar valores):\n'+JSON.stringify(precosOrcc.results.slice(0,8));
+    }
+    var r = await fetch('/api/ia-json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo:'consulta-tecnica',prompt:promptTec,max_output_tokens:2800,timeout_ms:30000})});
     var data = await r.json().catch(function(){return {};});
     if(!r.ok || data.error) throw new Error(data.error || 'Falha na consulta tecnica.');
     consultaAtualTecnica = data.json || data;
+    consultaAtualTecnica.precos_orcc = precosOrcc || {results:[]};
     renderConsultaTecnica(consultaAtualTecnica);
     salvarConsultaTecnica({id:genId(),data:dataHist(),pergunta:d.pergunta,tipo:d.tipo,area:d.area,uf:d.uf,json:consultaAtualTecnica});
     if(st){st.style.color='#00c896';st.textContent='Consulta concluida e salva na biblioteca.';}
   }catch(e){
     consultaAtualTecnica = gerarConsultaTecnicaLocal(d);
+    consultaAtualTecnica.precos_orcc = precosOrcc || {results:[]};
     renderConsultaTecnica(consultaAtualTecnica);
     salvarConsultaTecnica({id:genId(),data:dataHist(),pergunta:d.pergunta,tipo:d.tipo,area:d.area,uf:d.uf,json:consultaAtualTecnica});
     if(st){st.style.color='#f5c842';st.textContent='IA online nao concluiu. Gere uma resposta tecnica local para revisao.';}
