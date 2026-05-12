@@ -217,6 +217,39 @@ function mergeObraAdmin(currentObra, incomingObra, user){
   return marcarObraTenant(merged, user);
 }
 
+function novaObraCampo(inc, user){
+  const id = String(inc?.id || novoId('obra'));
+  const nome = String(inc?.nome || inc?.titulo || 'Obra sem nome');
+  return marcarObraTenant({
+    id,
+    nome,
+    titulo: String(inc?.titulo || nome),
+    tipo: String(inc?.tipo || inc?.tipoObra || ''),
+    tipoObra: String(inc?.tipoObra || inc?.tipo || ''),
+    cliente: String(inc?.cliente || inc?.contratante || ''),
+    contratante: String(inc?.contratante || inc?.cliente || ''),
+    local: String(inc?.local || inc?.cidade || inc?.municipio || inc?.endereco || ''),
+    cidade: String(inc?.cidade || inc?.municipio || inc?.local || ''),
+    municipio: String(inc?.municipio || inc?.cidade || inc?.local || ''),
+    endereco: String(inc?.endereco || inc?.local || ''),
+    status: String(inc?.status || 'Em ExecuÃ§Ã£o'),
+    contrato: String(inc?.contrato || inc?.contratoProcesso || inc?.numeroContrato || inc?.processo || ''),
+    contratoProcesso: String(inc?.contratoProcesso || inc?.contrato || inc?.numeroContrato || inc?.processo || ''),
+    valorEstimado: String(inc?.valorEstimado || inc?.valorBase || ''),
+    valorContratado: String(inc?.valorContratado || ''),
+    area: String(inc?.area || ''),
+    descricao: String(inc?.descricao || inc?.escopo || ''),
+    escopo: String(inc?.escopo || inc?.descricao || ''),
+    documentosConsulta: mergeDocsConsultaObra(null, inc?.documentosConsulta || inc?.documentosConsultaDiario || inc?.docsConsulta),
+    diario: mergeDiarioList([], inc?.diario || [], user),
+    historico: [{data:new Date().toLocaleDateString('pt-BR'),txt:'Obra criada no DiÃ¡rio por '+(user.email||'usuÃ¡rio de campo')}],
+    criadoNoDiario: true,
+    criadoPor: String(inc?.criadoPor || user?.email || ''),
+    criadoEm: String(inc?.criadoEm || new Date().toISOString()),
+    atualizadoEm: new Date().toISOString()
+  }, user);
+}
+
 export default async (req) => {
   const store = getStore({ name: "obras", consistency: "strong" });
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
@@ -244,7 +277,7 @@ export default async (req) => {
 
       if(user.role === 'admin' || user.role === 'superadmin'){
         const currentMap = new Map(obras.map(o=>[String(o.id), o]));
-        const merged = incoming.map(inc=>{
+        const merged = incoming.filter(inc=>!(inc && (inc._deletedObra===true || inc.excluida===true))).map(inc=>{
           const id = String(inc?.id || novoId('obra'));
           inc.id = id;
           return mergeObraAdmin(currentMap.get(id), inc, user);
@@ -254,7 +287,9 @@ export default async (req) => {
       }
 
       const inMap = new Map(incoming.map(o=>[String(o.id),o]));
-      const merged = obras.map(o=>{
+      const removidas = new Set(incoming.filter(o=>o && (o._deletedObra===true || o.excluida===true) && allowedObra(user,o.id)).map(o=>String(o.id)));
+      const currentIds = new Set(obras.map(o=>String(o.id)));
+      const merged = obras.filter(o=>!removidas.has(String(o.id))).map(o=>{
         const inc = inMap.get(String(o.id));
         if(!inc || !allowedObra(user,o.id)) return o;
         const oldCount = Array.isArray(o.diario) ? o.diario.length : 0;
@@ -266,6 +301,12 @@ export default async (req) => {
         o.historico = mergeHistorico([], o.historico).slice(0,700);
         o.atualizadoEm = new Date().toISOString();
         return o;
+      });
+      incoming.forEach(inc=>{
+        if(!inc || inc._deletedObra===true || inc.excluida===true) return;
+        const id = String(inc.id || '');
+        if(!id || currentIds.has(id)) return;
+        merged.unshift(novaObraCampo(inc, user));
       });
       await setTenantJson(store, user, "lista", merged);
       return new Response(JSON.stringify({ ok: true, count: merged.length }), { status: 200, headers });
