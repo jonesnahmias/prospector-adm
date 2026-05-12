@@ -1327,6 +1327,17 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
         <button onclick="voltarListaObras()" style="background:#0d1b2a;border:1px solid #1e3a5f;color:#4a90d9;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:700">← Voltar</button>
         <div style="font-size:15px;font-weight:700;color:#e8f4ff" id="form-obra-titulo">Nova Obra</div>
       </div>
+      <div id="fo-contrato-box" style="border:1px dashed #1e3a5f;border-radius:12px;background:#071828;padding:13px 16px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div style="font-size:12px;font-weight:900;color:#00c896;text-transform:uppercase;letter-spacing:.8px">Contrato da obra</div>
+            <div style="font-size:11px;color:#8a9bb0;margin-top:3px">Carregue o contrato/ordem de serviço para extrair dados e preencher automaticamente os campos abaixo.</div>
+          </div>
+          <button type="button" class="bai" onclick="document.getElementById('fo-contrato-file').click()" style="background:linear-gradient(135deg,#0057b7,#00a8e8);font-size:11px;padding:7px 12px">📎 Carregar contrato</button>
+        </div>
+        <input type="file" id="fo-contrato-file" accept=".pdf,.txt,.csv,.xlsx,.xls" style="display:none" onchange="processarContratoNovaObra(this)"/>
+        <div id="fo-contrato-status" style="font-size:11px;color:#4a90d9;margin-top:8px;min-height:14px"></div>
+      </div>
       <div class="form-grid">
         <div class="fg"><label class="fl">Nome da Obra *</label><input class="fi" id="fo-nome" placeholder="Ex: Reforma Sede CREA-SC"/></div>
         <div class="fg"><label class="fl">Tipo de Obra</label>
@@ -6434,6 +6445,7 @@ function labelModuloArquivo(m){
     'orcamento-prep':'Orçamento geral',
     'orcamento-obra':'Orçamento da obra',
     'projeto-obra':'Projeto da obra',
+    'contrato-obra':'Contrato da obra',
     'geral':'Geral'
   }[m] || m || 'Geral';
 }
@@ -6621,10 +6633,12 @@ function abrirFormObra(id){
   document.getElementById("obras-lista-view").style.display="none";
   document.getElementById("obras-detalhe-view").style.display="none";
   document.getElementById("obras-form-view").style.display="block";
+  setTimeout(bindContratoNovaObraDrop,30);
   var obras=getObras();
   if(id){
     var o=obras.find(function(x){return x.id===id;});
     if(!o)return;
+    obraContratoTemp=null;
     document.getElementById("form-obra-titulo").textContent="Editar Obra";
     document.getElementById("fo-id").value=o.id;
     document.getElementById("fo-nome").value=o.nome||"";
@@ -6642,7 +6656,10 @@ function abrirFormObra(id){
     document.getElementById("fo-contrato-num").value=o.contrato_num||"";
     document.getElementById("fo-fase").value=o.fase||"";
     document.getElementById("fo-desc").value=o.desc||"";
+    var stEdit=document.getElementById('fo-contrato-status');
+    if(stEdit){stEdit.style.color=o.contrato_arquivo?'#00c896':'#8a9bb0';stEdit.textContent=o.contrato_arquivo?('Contrato vinculado: '+(o.contrato_arquivo.nome||'arquivo')):'Opcional: carregue um contrato para revisar/preencher dados.';}
   } else {
+    limparContratoNovaObra();
     document.getElementById("form-obra-titulo").textContent="Nova Obra";
     document.getElementById("fo-id").value="";
     ["fo-nome","fo-local","fo-end","fo-valor","fo-contrato","fo-area","fo-inicio","fo-fim","fo-rt","fo-cliente","fo-contrato-num","fo-fase","fo-desc"].forEach(function(id){document.getElementById(id).value="";});
@@ -6674,6 +6691,9 @@ function salvarObra(){
     contrato_num:document.getElementById("fo-contrato-num").value,
     fase:document.getElementById("fo-fase").value,
     desc:document.getElementById("fo-desc").value,
+    contrato_arquivo:obraContratoTemp?{nome:obraContratoTemp.nome,tamanho:obraContratoTemp.tamanho,tipo:obraContratoTemp.tipo,data:obraContratoTemp.data}:obraAnterior.contrato_arquivo,
+    texto_contrato_base:obraContratoTemp?String(obraContratoTemp.texto||'').slice(0,250000):(obraAnterior.texto_contrato_base||''),
+    dados_contrato_extraidos:obraContratoTemp?(obraContratoTemp.dados||{}):(obraAnterior.dados_contrato_extraidos||{}),
     historico:isNova?[{tipo:"criação",data:new Date().toLocaleDateString("pt-BR"),txt:"Obra cadastrada"}]:obraAnterior.historico||[],
     notas:obraAnterior.notas||[],
     contatos:obraAnterior.contatos||[]
@@ -6688,8 +6708,16 @@ function salvarObra(){
     o.historico.push({tipo:'ia',data:new Date().toLocaleDateString('pt-BR'),txt:'Obra gerada automaticamente a partir de análise de edital/orçamento'});
     window.__obraAnalisesPendentes = null;
   }
+  if(obraContratoTemp){
+    o.historico = Array.isArray(o.historico) ? o.historico : [];
+    o.historico.push({tipo:'contrato',data:new Date().toLocaleDateString('pt-BR'),txt:'Contrato carregado e usado para preencher cadastro: '+(obraContratoTemp.nome||'arquivo')});
+  }
   if(isNova){obras.push(o);}else{obras=obras.map(function(x){return x.id===id?o:x;});}
   saveObras(obras);
+  if(obraContratoTemp && obraContratoTemp.file){
+    salvarArquivoCarregado(obraContratoTemp.file,'contrato-obra',obraContratoTemp.texto||'',id).then(function(){ renderArquivosTodos(); });
+    obraContratoTemp=null;
+  }
   document.getElementById("fo-status-msg").style.color="#00c896";
   document.getElementById("fo-status-msg").textContent="Obra salva!";
   setTimeout(voltarListaObras,800);
@@ -6814,7 +6842,182 @@ function extrairDadosArquivosObra(textoEdital,textoOrcamento){
   return dados;
 }
 
+var obraContratoTemp = null;
+
+function limparContratoNovaObra(){
+  obraContratoTemp = null;
+  var st=document.getElementById('fo-contrato-status');
+  var box=document.getElementById('fo-contrato-box');
+  if(st){st.style.color='#4a90d9';st.textContent='';}
+  if(box){box.style.borderColor='#1e3a5f';box.style.background='#071828';}
+}
+
+function extrairTextoContratoFile(file){
+  return new Promise(function(resolve,reject){
+    var nome=String((file&&file.name)||'').toLowerCase();
+    if(nome.endsWith('.pdf')){
+      if(typeof pdfjsLib==='undefined'){reject(new Error('PDF.js não carregou.'));return;}
+      var r=new FileReader();
+      r.onload=function(e){
+        pdfjsLib.getDocument({data:new Uint8Array(e.target.result)}).promise.then(function(pdf){
+          var ps=[];
+          for(var i=1;i<=pdf.numPages;i++){
+            ps.push(pdf.getPage(i).then(function(pg){return pg.getTextContent().then(function(tc){return tc.items.map(function(s){return s.str;}).join(' ');});}));
+          }
+          Promise.all(ps).then(function(pgs){resolve(pgs.join('\n\n'));});
+        }).catch(function(){reject(new Error('Erro ao ler PDF do contrato.'));});
+      };
+      r.onerror=function(){reject(new Error('Erro ao abrir arquivo.'));};
+      r.readAsArrayBuffer(file);
+      return;
+    }
+    if(nome.endsWith('.xlsx')||nome.endsWith('.xls')){
+      if(typeof XLSX==='undefined'){reject(new Error('XLSX não carregou.'));return;}
+      var rx=new FileReader();
+      rx.onload=function(e){
+        try{
+          var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+          var partes=[];
+          wb.SheetNames.forEach(function(sn){partes.push('=== '+sn+' ===\n'+XLSX.utils.sheet_to_csv(wb.Sheets[sn]));});
+          resolve(partes.join('\n\n'));
+        }catch(err){reject(new Error('Erro ao ler planilha do contrato.'));}
+      };
+      rx.onerror=function(){reject(new Error('Erro ao abrir planilha.'));};
+      rx.readAsArrayBuffer(file);
+      return;
+    }
+    var rt=new FileReader();
+    rt.onload=function(e){resolve(String(e.target.result||''));};
+    rt.onerror=function(){reject(new Error('Erro ao ler arquivo.'));};
+    rt.readAsText(file,'UTF-8');
+  });
+}
+
+function valorMonetarioContratoObra(txt){
+  txt=String(txt||'');
+  var regs=[
+    /(?:valor\s+(?:global|total|contratado|do\s+contrato)|pre[cç]o\s+(?:global|total)|import[aâ]ncia\s+de)[^\dR$]{0,80}(?:R\$\s*)?([\d.]{1,15},\d{2})/i,
+    /(?:R\$\s*)([\d.]{1,15},\d{2})/i
+  ];
+  for(var i=0;i<regs.length;i++){
+    var m=txt.match(regs[i]);
+    if(m&&m[1]) return numeroDeTextoObra(m[1]);
+  }
+  return '';
+}
+
+function objetoContratoObra(txt){
+  return textoPlanoObra(primeiraCapturaObra(txt,[
+    /(?:objeto\s+(?:do\s+presente\s+contrato|contratual|da\s+contrata[cç][aã]o)?|cl[aá]usula\s+primeira\s*[-–—]?\s*objeto)\s*[:\-–—]?\s*([^;\n]{20,450})/i,
+    /(?:contrata[cç][aã]o\s+de\s+empresa\s+(?:especializada\s+)?para)\s*([^;\n]{20,450})/i,
+    /(?:execu[cç][aã]o\s+(?:da|de|do)\s+obra\s+(?:de|para))\s*([^;\n]{20,450})/i
+  ])).replace(/\s{2,}/g,' ').slice(0,450);
+}
+
+function extrairDadosContratoObra(texto){
+  var txt=normalizarEspacosObra(texto||'');
+  var objeto=objetoContratoObra(txt);
+  var valor=valorMonetarioContratoObra(txt);
+  var cliente=primeiraCapturaObra(txt,[
+    /contratante\s*[:\-–—]?\s*([^.;\n]{4,140})/i,
+    /(?:munic[ií]pio|prefeitura\s+municipal)\s+de\s+([^.;\n]{4,100})/i,
+    /(prefeitura\s+municipal\s+de\s+[^.;\n]{3,100})/i,
+    /(governo\s+do\s+estado\s+[^.;\n]{3,100})/i
+  ]);
+  var contrato=primeiraCapturaObra(txt,[
+    /(?:contrato|termo\s+de\s+contrato)\s*(?:administrativo)?\s*(?:n[ºo.]*)?\s*[:\-–—]?\s*([A-Z0-9][A-Z0-9./-]{2,40})/i,
+    /(?:processo)\s*(?:administrativo)?\s*(?:n[ºo.]*)?\s*[:\-–—]?\s*([A-Z0-9][A-Z0-9./-]{2,40})/i
+  ]);
+  var local=cidadeUfDeTextoObra(txt);
+  var end=primeiraCapturaObra(txt,[
+    /(?:local\s+da\s+obra|endereco|endere[cç]o|local\s+de\s+execu[cç][aã]o|localiza[cç][aã]o)\s*[:\-–—]?\s*([^.;\n]{6,160})/i
+  ]);
+  var inicio=dataIsoDeTextoObra(primeiraCapturaObra(txt,[
+    /(?:ordem\s+de\s+servi[cç]o|in[ií]cio\s+dos\s+servi[cç]os|data\s+de\s+in[ií]cio|assinatura)\s*[:\-–—]?\s*([^.;\n]{6,60})/i
+  ]));
+  var meses=prazoMesesDeTextoObra(txt);
+  var dias=0, md=txt.match(/(?:prazo|vig[eê]ncia|execu[cç][aã]o)[^\d]{0,40}(\d{2,4})\s*dias/i);
+  if(md) dias=Number(md[1]||0);
+  var fim='';
+  if(inicio&&meses) fim=somarMesesObra(inicio,meses);
+  if(inicio&&!fim&&dias){var d=new Date(inicio+'T00:00:00');d.setDate(d.getDate()+dias);fim=d.toISOString().slice(0,10);}
+  var rt=primeiraCapturaObra(txt,[
+    /(?:respons[aá]vel\s+t[eé]cnico|engenheiro|fiscal\s+t[eé]cnico)\s*[:\-–—]?\s*([^.;\n]{4,120})/i,
+    /\b(CREA[-\s]?[A-Z]{2}\s*[0-9.\/-]{3,30}[^.;\n]{0,80})/i
+  ]);
+  var area=primeiraCapturaObra(txt,[
+    /(?:[aá]rea\s+(?:total|constru[ií]da|da\s+obra))\s*[:\-–—]?\s*([\d.,]+)\s*m[²2]/i
+  ]);
+  area=area?numeroDeTextoObra(area):'';
+  return {
+    nome: objeto ? objeto.slice(0,120) : '',
+    tipo: classificarTipoObraAuto('',objeto+' '+txt.slice(0,1200)),
+    local: local,
+    end: end,
+    valor: valor,
+    contrato: valor,
+    area: area,
+    inicio: inicio,
+    fim: fim,
+    rt: rt,
+    cliente: cliente,
+    contrato_num: contrato,
+    fase: 'Contrato carregado - revisar dados',
+    desc: [objeto?'Objeto: '+objeto:'', meses?'Prazo: '+meses+' meses':(dias?'Prazo: '+dias+' dias':''), 'Fonte: contrato/ordem de serviço carregado no cadastro da obra.'].filter(Boolean).join('\n')
+  };
+}
+
+function aplicarDadosContratoObra(dados){
+  dados=dados||{};
+  Object.keys({nome:1,tipo:1,local:1,end:1,valor:1,contrato:1,area:1,inicio:1,fim:1,rt:1,cliente:1,contrato_num:1,fase:1,desc:1}).forEach(function(k){
+    var id='fo-'+(k==='contrato_num'?'contrato-num':k);
+    if(k==='contrato') id='fo-contrato';
+    var el=document.getElementById(id);
+    if(el && dados[k] && !String(el.value||'').trim()) el.value=dados[k];
+  });
+  var status=document.getElementById('fo-status');
+  if(status && (!status.value || status.value==='prospecção')) status.value='em execução';
+}
+
+function processarContratoNovaObra(input){
+  var file=input&&input.files&&input.files[0]; if(!file)return;
+  var st=document.getElementById('fo-contrato-status');
+  var box=document.getElementById('fo-contrato-box');
+  if(st){st.style.color='#4a90d9';st.textContent='Extraindo informações do contrato...';}
+  if(box){box.style.borderColor='#0057b7';box.style.background='#0d2a47';}
+  extrairTextoContratoFile(file).then(function(texto){
+    var dados=extrairDadosContratoObra(texto);
+    obraContratoTemp={file:file,texto:texto,dados:dados,nome:file.name,tamanho:file.size,tipo:file.type||'',data:new Date().toISOString()};
+    aplicarDadosContratoObra(dados);
+    var preenchidos=Object.keys(dados).filter(function(k){return dados[k];}).length;
+    if(st){st.style.color='#00c896';st.textContent='Contrato carregado: '+file.name+' · '+texto.length.toLocaleString('pt-BR')+' caracteres · '+preenchidos+' campo(s) identificados. Revise antes de salvar.';}
+    if(box){box.style.borderColor='#00c896';box.style.background='#071f1d';}
+  }).catch(function(e){
+    if(st){st.style.color='#e84545';st.textContent=(e&&e.message)||'Erro ao extrair contrato.';}
+    if(box){box.style.borderColor='#e84545';}
+  }).finally(function(){input.value='';});
+}
+
+function bindContratoNovaObraDrop(){
+  var box=document.getElementById('fo-contrato-box'), input=document.getElementById('fo-contrato-file');
+  if(!box||!input||box.dataset.dropContratoBind)return;
+  box.dataset.dropContratoBind='1';
+  box.addEventListener('dragover',function(e){e.preventDefault();box.style.borderColor='#00a8e8';box.style.background='#0d2a47';});
+  box.addEventListener('dragleave',function(){box.style.borderColor='#1e3a5f';box.style.background='#071828';});
+  box.addEventListener('drop',function(e){
+    e.preventDefault();box.style.borderColor='#1e3a5f';box.style.background='#071828';
+    var file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(!file)return;
+    var dt=new DataTransfer();dt.items.add(file);input.files=dt.files;processarContratoNovaObra(input);
+  });
+}
+
 function gerarObraDeAnalises(){
+  navSec('obras',document.getElementById('bn-obras'));
+  var st=document.getElementById('obras-sync-status');
+  if(st){st.style.color='#f5c842';st.textContent='Para cadastrar nova obra, use + Nova Obra no módulo Obras e carregue primeiro o contrato da obra.';}
+  alert('Novas obras agora devem ser cadastradas somente pelo módulo Obras. Clique em + Nova Obra e carregue o contrato para preencher os campos automaticamente.');
+  return;
   var edital = ultimaAnaliseEditalObra();
   var orc = ultimaAnaliseOrcamentoObra();
   if(!edital && !orc){alert('Analise um edital e/ou orçamento antes de gerar a obra.');return;}
@@ -8062,7 +8265,7 @@ function homeAbrirObras(){
 }
 function homeNovaObra(){
   navSec('obras',document.getElementById('bn-obras'));
-  setTimeout(function(){if(typeof abrirFormObra==='function') abrirFormObra(null); window.scrollTo({top:0,behavior:'smooth'});},50);
+  setTimeout(function(){if(typeof voltarListaObras==='function') voltarListaObras(); var st=document.getElementById('obras-sync-status'); if(st){st.style.color='#f5c842';st.textContent='Para nova obra, clique em + Nova Obra neste módulo e carregue o contrato primeiro.';} window.scrollTo({top:0,behavior:'smooth'});},50);
 }
 function homeAbrirUltimaObra(sub){
   var obras=getObras ? (getObras()||[]) : [];
@@ -9859,7 +10062,7 @@ function renderHistoricoEditais(toggle){
     box.innerHTML = '<div class="tbox" style="border-left-color:#f5c842"><div class="ttitle" style="color:#f5c842">📚 Histórico de Editais</div><div style="font-size:12px;color:#8a9bb0;margin-top:6px">Nenhuma análise salva ainda. Cada importação de análise de edital será gravada automaticamente aqui.</div></div>';
     return;
   }
-  var html = '<div class="tbox" style="border-left-color:#f5c842"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:10px"><div class="ttitle" style="color:#f5c842">📚 Histórico de Editais</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="gerarObraDeAnalises()" style="background:#005f20;color:#00c896;border:1px solid #00c896;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800">+ Gerar Obra</button><button onclick="renderHistoricoEditais(true)" style="background:#1e3a5f;color:#8a9bb0;border:0;border-radius:6px;padding:5px 10px;cursor:pointer">Fechar</button></div></div>';
+  var html = '<div class="tbox" style="border-left-color:#f5c842"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:10px"><div class="ttitle" style="color:#f5c842">📚 Histórico de Editais</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="gerarObraDeAnalises()" style="background:#005f20;color:#00c896;border:1px solid #00c896;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800">Abrir Obras</button><button onclick="renderHistoricoEditais(true)" style="background:#1e3a5f;color:#8a9bb0;border:0;border-radius:6px;padding:5px 10px;cursor:pointer">Fechar</button></div></div>';
   html += lista.map(function(it){
     var rec = it.recomendacao || '--';
     var cor = {PARTICIPAR:'#00c896',AVALIAR:'#f5c842',DESCARTAR:'#e84545'}[rec] || '#8a9bb0';
@@ -10311,7 +10514,7 @@ function renderHistoricoOrcGeral(toggle){
     box.innerHTML = '<div class="tbox" style="border-left-color:#f5c842"><div class="ttitle" style="color:#f5c842">📚 Histórico de Orçamentos</div><div style="font-size:12px;color:#8a9bb0;margin-top:6px">Nenhuma análise de orçamento salva ainda. Cada importação será gravada automaticamente aqui.</div></div>';
     return;
   }
-  var html = '<div class="tbox" style="border-left-color:#f5c842"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:10px"><div class="ttitle" style="color:#f5c842">📚 Histórico de Orçamentos</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="gerarObraDeAnalises()" style="background:#005f20;color:#00c896;border:1px solid #00c896;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800">+ Gerar Obra</button><button onclick="renderHistoricoOrcGeral(true)" style="background:#1e3a5f;color:#8a9bb0;border:0;border-radius:6px;padding:5px 10px;cursor:pointer">Fechar</button></div></div>';
+  var html = '<div class="tbox" style="border-left-color:#f5c842"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:10px"><div class="ttitle" style="color:#f5c842">📚 Histórico de Orçamentos</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="gerarObraDeAnalises()" style="background:#005f20;color:#00c896;border:1px solid #00c896;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800">Abrir Obras</button><button onclick="renderHistoricoOrcGeral(true)" style="background:#1e3a5f;color:#8a9bb0;border:0;border-radius:6px;padding:5px 10px;cursor:pointer">Fechar</button></div></div>';
   html += lista.map(function(it){
     var st = it.status_geral || '--';
     var cor = {COMPATIVEL:'#00c896',OK:'#00c896',OK_COM_ALERTAS:'#f5c842',ATENCAO:'#f5c842',SOBREPRECO:'#e84545',CRITICO:'#e84545'}[st] || '#8a9bb0';
