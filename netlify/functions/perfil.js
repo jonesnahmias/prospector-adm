@@ -6,7 +6,7 @@ export default async (req) => {
   const headers = corsHeaders("GET, POST, OPTIONS");
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
-  const gate = requireAuth(req, headers, 'admin');
+  const gate = requireAuth(req, headers, req.method === "GET" ? 'campo' : 'admin');
   if (gate.error) return gate.error;
   const user = gate.user;
   if (req.method === "GET") {

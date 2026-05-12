@@ -991,7 +991,6 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
             <button class="home-shortcut" onclick="homeAbrirUltimaObra('arquivos')"><div class="home-shortcut-icon">📎</div><div class="home-shortcut-title">Arquivos salvos</div><div class="home-shortcut-desc">Consultar documentos vinculados à obra.</div></button>
             <button class="home-shortcut" onclick="homeAbrirUltimaObra('med')"><div class="home-shortcut-icon">📏</div><div class="home-shortcut-title">Medições da obra</div><div class="home-shortcut-desc">Controlar boletins de medição, valores, retenções, glosas e pagamentos.</div></button>
             <button class="home-shortcut finance-feature" onclick="navFinanceiro()"><div class="home-shortcut-icon">💰</div><div class="home-shortcut-title">Controle de gastos</div><div class="home-shortcut-desc">Lançar despesas, notas, comprovantes e comparar gasto real com medições.</div></button>
-            <button class="home-shortcut" onclick="homeAbrirUltimaObra('diario')"><div class="home-shortcut-icon">📔</div><div class="home-shortcut-title">Diário de obra</div><div class="home-shortcut-desc">Registrar fotos, clima, efetivo, ocorrências e atividades.</div></button>
             <button class="home-shortcut" onclick="homeAbrirUltimaObra('contatos')"><div class="home-shortcut-icon">📇</div><div class="home-shortcut-title">Agenda da obra</div><div class="home-shortcut-desc">Consultar responsáveis, clientes, fornecedores, fiscalização e equipe.</div></button>
             <button class="home-shortcut" onclick="homeAbrirPerfil()"><div class="home-shortcut-icon">🏢</div><div class="home-shortcut-title">Perfil da empresa</div><div class="home-shortcut-desc">Editar dados, logo, acervo, capacidade técnica e faturamento.</div></button>
           </div>
@@ -1317,7 +1316,6 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
           <span style="background:#071828;border:1px solid #1e3a5f;border-radius:6px;padding:3px 9px;font-size:11px;color:#f5c842">🏕️ Canteiro</span>
           <span style="background:#071828;border:1px solid #1e3a5f;border-radius:6px;padding:3px 9px;font-size:11px;color:#00a8e8">⚙️ Dimensionamento</span>
           <span style="background:#071828;border:1px solid #1e3a5f;border-radius:6px;padding:3px 9px;font-size:11px;color:#c8d8e8">📅 Cronograma</span>
-          <span style="background:#071828;border:1px solid #1e3a5f;border-radius:6px;padding:3px 9px;font-size:11px;color:#c8d8e8">📔 Diário</span>
         </div>
       </div>
     </div>
@@ -1445,7 +1443,6 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
           <div class="fase-tabs">
             <button class="fase-tab" id="os-cron" onclick="obraSubAba('cron',this)">📅 Cronograma</button>
             <button class="fase-tab" id="os-med" onclick="obraSubAba('med',this)">📏 Medições</button>
-            <button class="fase-tab" id="os-diario" onclick="obraSubAba('diario',this)">📔 Diário</button>
           </div>
         </div>
         <div class="fase-sep"></div>
@@ -7210,6 +7207,10 @@ function salvarNota(){
 }
 
 function obraSubAba(id,btn){
+  if(id==="diario"){
+    window.open(DIARIO_APP_URL || 'https://prospectordiario.netlify.app/','_blank','noopener');
+    return;
+  }
   document.querySelectorAll(".fase-tab").forEach(function(b){b.classList.remove("on");});
   btn.classList.add("on");
   document.querySelectorAll(".obra-sub").forEach(function(a){a.classList.remove("show");});
