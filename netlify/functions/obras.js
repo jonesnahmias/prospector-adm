@@ -39,6 +39,10 @@ function campoView(o){
   };
 }
 
+function isCentroFinanceiro(o){
+  return o?.centroFinanceiro === true || String(o?.tipoCentro || '').trim() !== '';
+}
+
 function novoId(prefix='id'){
   return prefix+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 }
@@ -261,7 +265,7 @@ export default async (req) => {
       const data = await getTenantJson(store, user, "lista", []);
       const obras = filtrarObrasTenant(data, user);
       if(user.role === 'admin' || user.role === 'superadmin') return new Response(JSON.stringify(obras), { status: 200, headers });
-      const liberadas = obras.filter(o=>allowedObra(user,o.id)).map(campoView);
+      const liberadas = obras.filter(o=>!isCentroFinanceiro(o) && allowedObra(user,o.id)).map(campoView);
       return new Response(JSON.stringify(liberadas), { status: 200, headers });
     } catch (e) {
       return new Response("[]", { status: 200, headers });
@@ -286,8 +290,13 @@ export default async (req) => {
         return new Response(JSON.stringify({ ok: true, count: merged.length }), { status: 200, headers });
       }
 
+      const currentMap = new Map(obras.map(o=>[String(o.id), o]));
       const inMap = new Map(incoming.map(o=>[String(o.id),o]));
-      const removidas = new Set(incoming.filter(o=>o && (o._deletedObra===true || o.excluida===true) && allowedObra(user,o.id)).map(o=>String(o.id)));
+      const removidas = new Set(incoming.filter(o=>{
+        if(!o || !(o._deletedObra===true || o.excluida===true) || !allowedObra(user,o.id)) return false;
+        const atual = currentMap.get(String(o.id));
+        return !isCentroFinanceiro(atual);
+      }).map(o=>String(o.id)));
       const currentIds = new Set(obras.map(o=>String(o.id)));
       const merged = obras.filter(o=>!removidas.has(String(o.id))).map(o=>{
         const inc = inMap.get(String(o.id));
@@ -304,6 +313,7 @@ export default async (req) => {
       });
       incoming.forEach(inc=>{
         if(!inc || inc._deletedObra===true || inc.excluida===true) return;
+        if(isCentroFinanceiro(inc)) return;
         const id = String(inc.id || '');
         if(!id || currentIds.has(id)) return;
         merged.unshift(novaObraCampo(inc, user));
