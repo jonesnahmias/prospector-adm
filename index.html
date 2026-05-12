@@ -761,19 +761,20 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
 </head>
 <body class="auth-locked">
 
-<!-- CONTROLE DE ACESSO — 2 APPS EM 1 -->
+<!-- CONTROLE DE ACESSO — APP ADMIN -->
 <div id="auth-screen">
   <div class="auth-card">
     <div class="auth-logo prospector-logo-mark" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="lens" cx="43" cy="42" r="25"/><path class="handle" d="M62 62 L86 80"/><path class="spark" d="M43 24 L48 38 L62 43 L48 48 L43 62 L38 48 L24 43 L38 38 Z"/></svg></div>
     <div class="auth-title">Prospector</div>
     <div class="prospector-tag" style="margin-bottom:14px">Descubra · Analise · Decida</div>
-    <div class="auth-sub">Entre com seu usuário. Administradores acessam o app completo; usuários de campo acessam somente o Diário de Obras.</div>
+    <div class="auth-sub">Entre com seu usuário administrador. O Diário de Obras agora é um app separado para a equipe de campo.</div>
     <div class="auth-label">E-mail</div>
     <input class="auth-input" id="auth-email" type="email" autocomplete="username" placeholder="seu@email.com"/>
     <div class="auth-label">Senha</div>
     <input class="auth-input" id="auth-pass" type="password" autocomplete="current-password" placeholder="Senha" onkeydown="if(event.key==='Enter')authLogin()"/>
     <button class="auth-btn" id="auth-login-btn" onclick="authLogin()">Entrar</button>
     <div class="auth-status" id="auth-status"></div>
+    <div class="auth-note">Usuários de campo devem acessar o <a href="https://prospector-diario.netlify.app/" target="_blank" rel="noopener" style="color:#00c896;font-weight:900">Diário de Obras</a>.</div>
   </div>
 </div>
 
@@ -2660,6 +2661,7 @@ html.theme-gray .consulta-panel,html.theme-gray .consulta-result,html.theme-gray
     </button>
   </div>
   <div class="side-nav-actions">
+    <a class="bnav-action" href="https://prospector-diario.netlify.app/" target="_blank" rel="noopener" title="Abrir Diário de Obras">📔 <span class="bnav-label">Diário de Obras</span></a>
     <a class="bnav-action" href="https://www.pdf2go.com/pt" target="_blank" rel="noopener" title="Converter PDF para Excel">📄 <span class="bnav-label">PDF para Excel</span></a>
     <a class="bnav-action" href="https://orcc-sc.netlify.app/" target="_blank" rel="noopener" title="Abrir ORCC Orçamentos">📊 <span class="bnav-label">ORCC Orçamentos</span></a>
     <button class="bnav-action" onclick="abrirUsuariosModal()" title="Usuários e Acessos">👥 <span class="bnav-label">Usuários</span></button>
@@ -11496,8 +11498,9 @@ abrirObra = function(id){
 
 
 <script>
-// ==================== CONTROLE DE ACESSO — 2 APPS EM 1 ====================
+// ==================== CONTROLE DE ACESSO — PROSPECTOR ADMIN ====================
 var AUTH_STORAGE_KEY = 'prospector_auth_session_v1';
+var DIARIO_APP_URL = 'https://prospector-diario.netlify.app/';
 var authSession = null;
 var campoObrasCache = [];
 var campoObraAtual = '';
@@ -11603,9 +11606,11 @@ async function authEntrarSessao(){
     authRenderUserbar();
     if(!appPrincipalIniciado){ appPrincipalIniciado=true; iniciarAppPrincipal(); }
   }else{
-    authSetBody('auth-campo');
-    authRenderUserbar();
-    campoCarregarObras(true);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    authSession=null;
+    authSetBody('auth-locked');
+    setAuthStatus('Usuários de campo agora acessam o Diário de Obras em app separado. Abrindo...', false);
+    setTimeout(function(){ window.location.href = DIARIO_APP_URL; }, 900);
   }
 }
 function authRenderUserbar(){
