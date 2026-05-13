@@ -12596,6 +12596,7 @@ function renderFinanceiroPainel(forcarAtualizacao){
     return acc;
   },{base:0,realizado:0,pago:0,pendente:0,caixa:0,medicoes:0,qtd:0});
   var pctTotal=totais.base>0 ? (totais.realizado/totais.base*100) : 0;
+  var saldoBaseTotal=totais.base-totais.realizado;
   var totEl=document.getElementById('financeiro-totais');
   if(totEl){
     totEl.innerHTML=''+
@@ -12603,7 +12604,7 @@ function renderFinanceiroPainel(forcarAtualizacao){
       '<div class="financeiro-total-card"><div class="financeiro-total-val">'+fmtMedMoeda(totais.realizado)+'</div><div class="financeiro-total-lbl">Gasto realizado</div></div>'+
       '<div class="financeiro-total-card"><div class="financeiro-total-val">'+fmtMedMoeda(totais.pago)+'</div><div class="financeiro-total-lbl">Gasto pago</div></div>'+
       '<div class="financeiro-total-card"><div class="financeiro-total-val">'+fmtMedMoeda(totais.pendente)+'</div><div class="financeiro-total-lbl">Pendente</div></div>'+
-      '<div class="financeiro-total-card"><div class="financeiro-total-val" style="color:'+(totais.caixa>=0?'#00c896':'#e84545')+'">'+fmtMedMoeda(totais.caixa)+'</div><div class="financeiro-total-lbl">Medições pagas - gastos pagos</div></div>'+
+      '<div class="financeiro-total-card"><div class="financeiro-total-val" style="color:'+(saldoBaseTotal>=0?'#00c896':'#e84545')+'">'+fmtMedMoeda(saldoBaseTotal)+'</div><div class="financeiro-total-lbl">Base - realizado</div></div>'+
       '<div class="financeiro-total-card"><div class="financeiro-total-val">'+pctTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%</div><div class="financeiro-total-lbl">Consumo geral</div></div>';
   }
   var box=document.getElementById('financeiro-cards'); if(!box)return;
@@ -12902,6 +12903,7 @@ function abrirObraCompletaAtual(){
       return acc;
     },{base:0,realizado:0,pago:0,pendente:0,caixa:0,medicoes:0,qtd:0});
     var pctTotal=totais.base>0 ? (totais.realizado/totais.base*100) : 0;
+    var saldoBaseTotal=totais.base-totais.realizado;
     var totEl=document.getElementById('financeiro-totais');
     if(totEl){
       totEl.innerHTML=''+
@@ -12909,7 +12911,7 @@ function abrirObraCompletaAtual(){
         '<div class="financeiro-total-card"><div class="financeiro-total-val">'+fmtMedMoeda(totais.realizado)+'</div><div class="financeiro-total-lbl">Realizado</div></div>'+
         '<div class="financeiro-total-card"><div class="financeiro-total-val">'+fmtMedMoeda(totais.pago)+'</div><div class="financeiro-total-lbl">Pago</div></div>'+
         '<div class="financeiro-total-card"><div class="financeiro-total-val">'+fmtMedMoeda(totais.pendente)+'</div><div class="financeiro-total-lbl">Pendente</div></div>'+
-        '<div class="financeiro-total-card"><div class="financeiro-total-val" style="color:'+(totais.caixa>=0?'#00c896':'#e84545')+'">'+fmtMedMoeda(totais.caixa)+'</div><div class="financeiro-total-lbl">Saldo</div></div>'+
+        '<div class="financeiro-total-card"><div class="financeiro-total-val" style="color:'+(saldoBaseTotal>=0?'#00c896':'#e84545')+'">'+fmtMedMoeda(saldoBaseTotal)+'</div><div class="financeiro-total-lbl">Saldo</div></div>'+
         '<div class="financeiro-total-card"><div class="financeiro-total-val">'+pctTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%</div><div class="financeiro-total-lbl">Consumo</div></div>';
     }
     var box=document.getElementById('financeiro-cards'); if(!box)return;
