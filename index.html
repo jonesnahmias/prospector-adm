@@ -6640,21 +6640,21 @@ function abrirFormObra(id){
     obraContratoTemp=null;
     document.getElementById("form-obra-titulo").textContent="Editar Obra";
     document.getElementById("fo-id").value=o.id;
-    document.getElementById("fo-nome").value=o.nome||"";
-    document.getElementById("fo-tipo").value=o.tipo||"";
-    document.getElementById("fo-local").value=o.local||"";
-    document.getElementById("fo-end").value=o.end||"";
+    document.getElementById("fo-nome").value=corrigirMojibakeObra(o.nome||"");
+    document.getElementById("fo-tipo").value=corrigirMojibakeObra(o.tipo||"");
+    document.getElementById("fo-local").value=corrigirMojibakeObra(o.local||"");
+    document.getElementById("fo-end").value=corrigirMojibakeObra(o.end||"");
     document.getElementById("fo-status").value=o.status||"prospecção";
     document.getElementById("fo-valor").value=o.valor||"";
     document.getElementById("fo-contrato").value=o.contrato||"";
     document.getElementById("fo-area").value=o.area||"";
     document.getElementById("fo-inicio").value=o.inicio||"";
     document.getElementById("fo-fim").value=o.fim||"";
-    document.getElementById("fo-rt").value=o.rt||"";
-    document.getElementById("fo-cliente").value=o.cliente||"";
-    document.getElementById("fo-contrato-num").value=o.contrato_num||"";
-    document.getElementById("fo-fase").value=o.fase||"";
-    document.getElementById("fo-desc").value=o.desc||"";
+    document.getElementById("fo-rt").value=corrigirMojibakeObra(o.rt||"");
+    document.getElementById("fo-cliente").value=corrigirMojibakeObra(o.cliente||"");
+    document.getElementById("fo-contrato-num").value=corrigirMojibakeObra(o.contrato_num||"");
+    document.getElementById("fo-fase").value=corrigirMojibakeObra(o.fase||"");
+    document.getElementById("fo-desc").value=corrigirMojibakeObra(o.desc||"");
     var stEdit=document.getElementById('fo-contrato-status');
     if(stEdit){stEdit.style.color=o.contrato_arquivo?'#00c896':'#8a9bb0';stEdit.textContent=o.contrato_arquivo?('Contrato vinculado: '+(o.contrato_arquivo.nome||'arquivo')):'Opcional: carregue um contrato para revisar/preencher dados.';}
   } else {
@@ -6675,22 +6675,22 @@ function salvarObra(){
   var isNova=!document.getElementById("fo-id").value;
   var obraAnterior=obras.find(function(x){return x.id===id;})||{};
   var o=Object.assign({}, obraAnterior, {
-    id:id,nome:nome,
-    tipo:document.getElementById("fo-tipo").value,
-    local:document.getElementById("fo-local").value,
-    end:document.getElementById("fo-end").value,
+    id:id,nome:corrigirMojibakeObra(nome),
+    tipo:corrigirMojibakeObra(document.getElementById("fo-tipo").value),
+    local:corrigirMojibakeObra(document.getElementById("fo-local").value),
+    end:corrigirMojibakeObra(document.getElementById("fo-end").value),
     status:document.getElementById("fo-status").value,
     valor:document.getElementById("fo-valor").value,
     contrato:document.getElementById("fo-contrato").value,
     area:document.getElementById("fo-area").value,
     inicio:document.getElementById("fo-inicio").value,
     fim:document.getElementById("fo-fim").value,
-    rt:document.getElementById("fo-rt").value,
-    cliente:document.getElementById("fo-cliente").value,
-    contrato_num:document.getElementById("fo-contrato-num").value,
-    fase:document.getElementById("fo-fase").value,
-    desc:document.getElementById("fo-desc").value,
-    contrato_arquivo:obraContratoTemp?{nome:obraContratoTemp.nome,tamanho:obraContratoTemp.tamanho,tipo:obraContratoTemp.tipo,data:obraContratoTemp.data}:obraAnterior.contrato_arquivo,
+    rt:corrigirMojibakeObra(document.getElementById("fo-rt").value),
+    cliente:corrigirMojibakeObra(document.getElementById("fo-cliente").value),
+    contrato_num:corrigirMojibakeObra(document.getElementById("fo-contrato-num").value),
+    fase:corrigirMojibakeObra(document.getElementById("fo-fase").value),
+    desc:corrigirMojibakeObra(document.getElementById("fo-desc").value),
+    contrato_arquivo:obraContratoTemp?{id:obraContratoTemp.arquivoId||'',nome:corrigirMojibakeObra(obraContratoTemp.nome),tamanho:obraContratoTemp.tamanho,tipo:obraContratoTemp.tipo,data:obraContratoTemp.data}:obraAnterior.contrato_arquivo,
     texto_contrato_base:obraContratoTemp?String(obraContratoTemp.texto||'').slice(0,250000):(obraAnterior.texto_contrato_base||''),
     dados_contrato_extraidos:obraContratoTemp?(obraContratoTemp.dados||{}):(obraAnterior.dados_contrato_extraidos||{}),
     historico:isNova?[{tipo:"criação",data:new Date().toLocaleDateString("pt-BR"),txt:"Obra cadastrada"}]:obraAnterior.historico||[],
@@ -6723,7 +6723,7 @@ function salvarObra(){
 }
 
 function numeroDeTextoObra(v){
-  var s = String(v == null ? '' : v);
+  var s = corrigirMojibakeObra(v);
   if(!s) return '';
   s = s.replace(/[^\d,.-]/g,'');
   if(!s) return '';
@@ -6732,9 +6732,28 @@ function numeroDeTextoObra(v){
   return isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : '';
 }
 
+function corrigirMojibakeObra(v){
+  var s = String(v == null ? '' : v);
+  if(!s) return '';
+  if(/[ÃÂâï¿½�]/.test(s)){
+    try{
+      var dec = decodeURIComponent(escape(s));
+      var ruimAntes = (s.match(/[ÃÂï¿½�]/g)||[]).length;
+      var ruimDepois = (dec.match(/[ÃÂï¿½�]/g)||[]).length;
+      if(dec && ruimDepois < ruimAntes) s = dec;
+    }catch(e){}
+  }
+  return s
+    .replace(/ï¿½/g,'')
+    .replace(/\uFFFD/g,'')
+    .replace(/Â+/g,'')
+    .replace(/\s+([,.;:])/g,'$1')
+    .trim();
+}
+
 function textoPlanoObra(v){
   if(v == null) return '';
-  if(typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if(typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return corrigirMojibakeObra(v);
   if(Array.isArray(v)) return v.map(textoPlanoObra).filter(Boolean).join('; ');
   if(typeof v === 'object'){
     return Object.keys(v).map(function(k){return textoPlanoObra(v[k]);}).filter(Boolean).join(' - ');
@@ -6769,15 +6788,15 @@ function classificarTipoObraAuto(tipo,objeto){
 
 function preencherCampoObra(id,valor){
   var el=document.getElementById(id);
-  if(el) el.value = valor == null ? '' : String(valor);
+  if(el) el.value = valor == null ? '' : corrigirMojibakeObra(valor);
 }
 
 function normalizarEspacosObra(txt){
-  return String(txt||'').replace(/\s+/g,' ').trim();
+  return corrigirMojibakeObra(txt).replace(/\s+/g,' ').trim();
 }
 
 function primeiraCapturaObra(txt, regs){
-  txt = String(txt||'');
+  txt = corrigirMojibakeObra(txt);
   for(var i=0;i<regs.length;i++){
     var m = txt.match(regs[i]);
     if(m && m[1]) return normalizarEspacosObra(m[1]).replace(/[;,.:\-–—]+$/,'').trim();
@@ -6893,24 +6912,37 @@ function extrairTextoContratoFile(file){
 }
 
 function valorMonetarioContratoObra(txt){
-  txt=String(txt||'');
-  var regs=[
-    /(?:valor\s+(?:global|total|contratado|do\s+contrato)|pre[cç]o\s+(?:global|total)|import[aâ]ncia\s+de)[^\dR$]{0,80}(?:R\$\s*)?([\d.]{1,15},\d{2})/i,
-    /(?:R\$\s*)([\d.]{1,15},\d{2})/i
-  ];
-  for(var i=0;i<regs.length;i++){
-    var m=txt.match(regs[i]);
-    if(m&&m[1]) return numeroDeTextoObra(m[1]);
+  txt=corrigirMojibakeObra(txt);
+  var candidatos=[];
+  var re=/(.{0,90})(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2}|\d{4,15},\d{2})(.{0,70})/gi, m;
+  while((m=re.exec(txt))){
+    var ctx=normalizarEspacosObra((m[1]||'')+' '+(m[3]||'')).toLowerCase();
+    var n=parseMedNumero(m[2]);
+    if(!n || n<=0) continue;
+    var score=0;
+    if(/valor\s+(global|total|contratado|do contrato|contratual)|pre[cç]o\s+(global|total)|import[aâ]ncia|total\s+geral/.test(ctx)) score+=100;
+    if(/contrato|contratada|contrata[cç][aã]o/.test(ctx)) score+=35;
+    if(/obra|servi[cç]o|execu[cç][aã]o/.test(ctx)) score+=15;
+    if(/bdi|sem\s+bdi|total\s+do\s+bdi|reten[cç][aã]o|garantia|multa|empenho|medi[cç][aã]o|parcela/.test(ctx)) score-=55;
+    candidatos.push({valor:n,score:score});
   }
-  return '';
+  candidatos.sort(function(a,b){return (b.score-a.score)||(b.valor-a.valor);});
+  return candidatos.length ? String(Math.round(candidatos[0].valor*100)/100) : '';
 }
 
 function objetoContratoObra(txt){
-  return textoPlanoObra(primeiraCapturaObra(txt,[
-    /(?:objeto\s+(?:do\s+presente\s+contrato|contratual|da\s+contrata[cç][aã]o)?|cl[aá]usula\s+primeira\s*[-–—]?\s*objeto)\s*[:\-–—]?\s*([^;\n]{20,450})/i,
-    /(?:contrata[cç][aã]o\s+de\s+empresa\s+(?:especializada\s+)?para)\s*([^;\n]{20,450})/i,
-    /(?:execu[cç][aã]o\s+(?:da|de|do)\s+obra\s+(?:de|para))\s*([^;\n]{20,450})/i
-  ])).replace(/\s{2,}/g,' ').slice(0,450);
+  txt=corrigirMojibakeObra(txt);
+  var bloco=primeiraCapturaObra(txt,[
+    /(?:cl[aá]usula\s+primeira\s*[-–—]?\s*)?objeto(?:\s+do\s+presente\s+contrato|\s+contratual|\s+da\s+contrata[cç][aã]o)?\s*[:\-–—]?\s*([\s\S]{30,900}?)(?=\s+(?:cl[aá]usula|valor|pre[cç]o|prazo|vig[eê]ncia|dota[cç][aã]o|forma\s+de\s+pagamento)\b|$)/i,
+    /(contrata[cç][aã]o\s+de\s+empresa\s+(?:especializada\s+)?[\s\S]{20,650}?)(?=\s+(?:valor|pre[cç]o|prazo|vig[eê]ncia|cl[aá]usula)\b|$)/i,
+    /(execu[cç][aã]o\s+(?:da|de|do)\s+obra[\s\S]{20,650}?)(?=\s+(?:valor|pre[cç]o|prazo|vig[eê]ncia|cl[aá]usula)\b|$)/i
+  ]);
+  bloco=textoPlanoObra(bloco)
+    .replace(/\bcontratada\b[\s\S]*$/i,'')
+    .replace(/\bvalor\b[\s\S]*$/i,'')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+  return bloco.slice(0,650);
 }
 
 function extrairDadosContratoObra(texto){
@@ -6918,7 +6950,10 @@ function extrairDadosContratoObra(texto){
   var objeto=objetoContratoObra(txt);
   var valor=valorMonetarioContratoObra(txt);
   var cliente=primeiraCapturaObra(txt,[
-    /contratante\s*[:\-–—]?\s*([^.;\n]{4,140})/i,
+    /contratante\s*[:\-–—]?\s*([^.;\n]{4,180})/i,
+    /(?:contratante|cliente)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][^.;\n]{4,160})/i,
+    /(base\s+a[eé]rea\s+de\s+[^.;\n]{3,100})/i,
+    /(comando\s+da\s+aeron[aá]utica[^.;\n]{0,100})/i,
     /(?:munic[ií]pio|prefeitura\s+municipal)\s+de\s+([^.;\n]{4,100})/i,
     /(prefeitura\s+municipal\s+de\s+[^.;\n]{3,100})/i,
     /(governo\s+do\s+estado\s+[^.;\n]{3,100})/i
@@ -6929,13 +6964,15 @@ function extrairDadosContratoObra(texto){
   ]);
   var local=cidadeUfDeTextoObra(txt);
   var end=primeiraCapturaObra(txt,[
-    /(?:local\s+da\s+obra|endereco|endere[cç]o|local\s+de\s+execu[cç][aã]o|localiza[cç][aã]o)\s*[:\-–—]?\s*([^.;\n]{6,160})/i
+    /(?:local\s+da\s+obra|endereco|endere[cç]o|local\s+de\s+execu[cç][aã]o|localiza[cç][aã]o)\s*[:\-–—]?\s*([^.;\n]{6,220})/i,
+    /(base\s+a[eé]rea\s+de\s+[^.;\n]{3,120})/i,
+    /(?:situad[ao]|localizad[ao])\s+(?:na|no|em)\s+([^.;\n]{6,180})/i
   ]);
   var inicio=dataIsoDeTextoObra(primeiraCapturaObra(txt,[
-    /(?:ordem\s+de\s+servi[cç]o|in[ií]cio\s+dos\s+servi[cç]os|data\s+de\s+in[ií]cio|assinatura)\s*[:\-–—]?\s*([^.;\n]{6,60})/i
+    /(?:ordem\s+de\s+servi[cç]o|in[ií]cio\s+dos\s+servi[cç]os|data\s+de\s+in[ií]cio|assinatura|data\s+da\s+assinatura)\s*[:\-–—]?\s*([^.;\n]{6,80})/i
   ]));
   var meses=prazoMesesDeTextoObra(txt);
-  var dias=0, md=txt.match(/(?:prazo|vig[eê]ncia|execu[cç][aã]o)[^\d]{0,40}(\d{2,4})\s*dias/i);
+  var dias=0, md=txt.match(/(?:prazo\s+(?:de\s+)?(?:execu[cç][aã]o|contratual)?|vig[eê]ncia|execu[cç][aã]o)[^\d]{0,80}(\d{2,4})\s*(?:dias|dia\(s\)|dias\s+consecutivos|dias\s+corridos)/i);
   if(md) dias=Number(md[1]||0);
   var fim='';
   if(inicio&&meses) fim=somarMesesObra(inicio,meses);
@@ -6948,8 +6985,9 @@ function extrairDadosContratoObra(texto){
     /(?:[aá]rea\s+(?:total|constru[ií]da|da\s+obra))\s*[:\-–—]?\s*([\d.,]+)\s*m[²2]/i
   ]);
   area=area?numeroDeTextoObra(area):'';
+  var nomeBase=objeto ? objeto.replace(/^contrata[cç][aã]o\s+de\s+empresa\s+(?:especializada\s+)?(?:para\s+)?/i,'').replace(/^execu[cç][aã]o\s+(?:da|de|do)\s+/i,'').trim() : '';
   return {
-    nome: objeto ? objeto.slice(0,120) : '',
+    nome: nomeBase ? nomeBase.slice(0,120) : '',
     tipo: classificarTipoObraAuto('',objeto+' '+txt.slice(0,1200)),
     local: local,
     end: end,
@@ -6959,20 +6997,20 @@ function extrairDadosContratoObra(texto){
     inicio: inicio,
     fim: fim,
     rt: rt,
-    cliente: cliente,
+    cliente: textoPlanoObra(cliente).slice(0,140),
     contrato_num: contrato,
-    fase: 'Contrato carregado - revisar dados',
-    desc: [objeto?'Objeto: '+objeto:'', meses?'Prazo: '+meses+' meses':(dias?'Prazo: '+dias+' dias':''), 'Fonte: contrato/ordem de serviço carregado no cadastro da obra.'].filter(Boolean).join('\n')
+    fase: 'Contratada - dados extraídos do contrato',
+    desc: [objeto?'Objeto: '+objeto:'', valor?'Valor contratado: R$ '+Number(valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'', meses?'Prazo de execução: '+meses+' meses':(dias?'Prazo de execução: '+dias+' dias':''), end?'Local/endereço: '+end:'', 'Fonte: contrato/ordem de serviço carregado no cadastro da obra.'].filter(Boolean).join('\n')
   };
 }
 
-function aplicarDadosContratoObra(dados){
+function aplicarDadosContratoObra(dados,sobrescrever){
   dados=dados||{};
   Object.keys({nome:1,tipo:1,local:1,end:1,valor:1,contrato:1,area:1,inicio:1,fim:1,rt:1,cliente:1,contrato_num:1,fase:1,desc:1}).forEach(function(k){
     var id='fo-'+(k==='contrato_num'?'contrato-num':k);
     if(k==='contrato') id='fo-contrato';
     var el=document.getElementById(id);
-    if(el && dados[k] && !String(el.value||'').trim()) el.value=dados[k];
+    if(el && dados[k] && (sobrescrever || !String(el.value||'').trim() || /[ÃÂï¿½�]/.test(String(el.value||'')))) el.value=corrigirMojibakeObra(dados[k]);
   });
   var status=document.getElementById('fo-status');
   if(status && (!status.value || status.value==='prospecção')) status.value='em execução';
@@ -6985,11 +7023,19 @@ function processarContratoNovaObra(input){
   if(st){st.style.color='#4a90d9';st.textContent='Extraindo informações do contrato...';}
   if(box){box.style.borderColor='#0057b7';box.style.background='#0d2a47';}
   extrairTextoContratoFile(file).then(function(texto){
+    texto=corrigirMojibakeObra(texto);
     var dados=extrairDadosContratoObra(texto);
     obraContratoTemp={file:file,texto:texto,dados:dados,nome:file.name,tamanho:file.size,tipo:file.type||'',data:new Date().toISOString()};
-    aplicarDadosContratoObra(dados);
+    aplicarDadosContratoObra(dados,true);
     var preenchidos=Object.keys(dados).filter(function(k){return dados[k];}).length;
-    if(st){st.style.color='#00c896';st.textContent='Contrato carregado: '+file.name+' · '+texto.length.toLocaleString('pt-BR')+' caracteres · '+preenchidos+' campo(s) identificados. Revise antes de salvar.';}
+    var idAtual=(document.getElementById('fo-id')||{}).value||'';
+    if(idAtual){
+      salvarArquivoCarregado(file,'contrato-obra',texto,idAtual).then(function(arq){
+        if(arq && obraContratoTemp) obraContratoTemp.arquivoId=arq.id||'';
+        renderArquivosTodos();
+      });
+    }
+    if(st){st.style.color='#00c896';st.textContent='Contrato carregado: '+corrigirMojibakeObra(file.name)+' · '+texto.length.toLocaleString('pt-BR')+' caracteres · '+preenchidos+' campo(s) identificados. O arquivo '+(idAtual?'já foi salvo na obra; ':'será salvo ao clicar em Salvar Obra. ')+'Revise antes de salvar.';}
     if(box){box.style.borderColor='#00c896';box.style.background='#071f1d';}
   }).catch(function(e){
     if(st){st.style.color='#e84545';st.textContent=(e&&e.message)||'Erro ao extrair contrato.';}
