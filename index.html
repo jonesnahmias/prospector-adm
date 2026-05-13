@@ -6557,7 +6557,7 @@ function renderFinanceiroResumoCard(o){
     '<div class="obra-finance-mini"><div class="obra-finance-v">'+fmtMedMoeda(r.realizado)+'</div><div class="obra-finance-l">Gasto realizado</div></div>'+
     '<div class="obra-finance-mini"><div class="obra-finance-v">'+fmtMedMoeda(r.pago)+'</div><div class="obra-finance-l">Pago</div></div>'+
     '<div class="obra-finance-mini"><div class="obra-finance-v">'+fmtMedMoeda(r.pendente)+'</div><div class="obra-finance-l">Pendente</div></div>'+
-    '<div class="obra-finance-mini"><div class="obra-finance-v" style="color:'+corSaldo+'">'+fmtMedMoeda(r.caixa)+'</div><div class="obra-finance-l">Saldo financeiro</div></div>'+
+    '<div class="obra-finance-mini"><div class="obra-finance-v" style="color:'+corSaldo+'">'+fmtMedMoeda(r.caixa)+'</div><div class="obra-finance-l">'+(centro?'Saldo administrativo':'Saldo da base')+'</div></div>'+
     '<div class="obra-finance-mini"><div class="obra-finance-v" style="color:'+corPct+'">'+(r.base?Number(r.percentual||0).toFixed(1).replace('.',',')+'%':'—')+'</div><div class="obra-finance-l">'+(centro?'Consumo base':'Consumo orçamento')+'</div></div>'+
   '</div>';
 }
@@ -7581,7 +7581,7 @@ function calcResumoGastos(o){
   var pago=lista.filter(function(g){return g.status==='pago';}).reduce(function(t,g){return t+parseMedNumero(g.valor_realizado || g.valor_previsto);},0);
   var pendente=lista.filter(function(g){return g.status!=='pago';}).reduce(function(t,g){return t+parseMedNumero(g.valor_realizado || g.valor_previsto);},0);
   var med=typeof calcResumoMedicoes==='function' ? calcResumoMedicoes(o) : {pagas:0};
-  var caixa=(o&&o.centroFinanceiro) ? base-pago : parseMedNumero(med.pagas)-pago;
+  var caixa=base-realizado;
   var pct=base>0?(realizado/base*100):0;
   return {qtd:lista.length,base:base,previsto:previsto,realizado:realizado,pago:pago,pendente:pendente,caixa:caixa,percentual:pct,medicoesPagas:parseMedNumero(med.pagas)};
 }
@@ -7634,7 +7634,7 @@ function renderGastosObra(obra){
       '<div class="gasto-kpi"><div class="gasto-kpi-v">'+fmtMedMoeda(res.pago)+'</div><div class="gasto-kpi-l">Total pago</div></div>'+ 
       '<div class="gasto-kpi"><div class="gasto-kpi-v">'+fmtMedMoeda(res.pendente)+'</div><div class="gasto-kpi-l">Pendente</div></div>'+ 
       '<div class="gasto-kpi"><div class="gasto-kpi-v">'+res.percentual.toLocaleString('pt-BR',{maximumFractionDigits:2})+'%</div><div class="gasto-kpi-l">'+(centro?'Consumo da base':'Consumo da base da obra')+'</div></div>'+ 
-      '<div class="gasto-kpi"><div class="gasto-kpi-v" style="color:'+(res.caixa>=0?'#00c896':'#e84545')+'">'+fmtMedMoeda(res.caixa)+'</div><div class="gasto-kpi-l">'+(centro?'Saldo administrativo':'Medições pagas - gastos pagos')+'</div></div>';
+      '<div class="gasto-kpi"><div class="gasto-kpi-v" style="color:'+(res.caixa>=0?'#00c896':'#e84545')+'">'+fmtMedMoeda(res.caixa)+'</div><div class="gasto-kpi-l">'+(centro?'Saldo administrativo':'Saldo da base')+'</div></div>';
   }
   renderCategoriasGastos(o);
   var box=document.getElementById('gastos-lista'); if(!box)return;
